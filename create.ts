@@ -1,7 +1,7 @@
 import DeviceManager from '../DeviceManager';
 import { TrackInvalidError } from '../errors';
 import { mediaTrackToLocalTrack } from '../participant/publishUtils';
-import { audioDefaults, videoDefaults } from '../defaults';
+import { audioDefaults, videoDefaults } from './defaults';
 import LocalAudioTrack from './LocalAudioTrack';
 import LocalTrack from './LocalTrack';
 import LocalVideoTrack from './LocalVideoTrack';
@@ -14,7 +14,6 @@ import {
 } from './options';
 import { Track } from './Track';
 import { constraintsForOptions, mergeDefaultOptions } from './utils';
-//import { encodeFunction } from './ee2e'
 
 /**
  * Creates a local video and audio track at the same time. When acquiring both
@@ -59,16 +58,7 @@ export async function createLocalTracks(
       trackConstraints = conOrBool;
     }
 
-	// Applying encryption transform 
-	// @ts-expect-error
-	const trackGenerator = new MediaStreamTrackGenerator(mediaStreamTrack.kind);
-	const trackProcessor = new MediaStreamTrackProcessor(track.mediaStreamTrack);
-	const transformer = new TransformStream({
-		transform: ee2e.encodeFunction.bind(userContext)
-	});
-	encryptedTrack = trackProcessor.readable.pipeThrough(transformer).pipeTo(trackGenerator.writable);
-
-    const track = mediaTrackToLocalTrack(encryptedTrack, trackConstraints);	
+    const track = mediaTrackToLocalTrack(mediaStreamTrack, trackConstraints);	
     if (track.kind === Track.Kind.Video) {
       track.source = Track.Source.Camera;
     } else if (track.kind === Track.Kind.Audio) {

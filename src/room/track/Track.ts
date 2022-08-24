@@ -63,12 +63,27 @@ export abstract class Track extends (EventEmitter as new () => TypedEventEmitter
     }
   }
 
+  encryptTrack() {
+	  // @ts-expect-error
+	  trackProcessor = new MediaStreamTrackProcessor({track: this._mediaStreamTrack});
+	  // @ts-expect-error
+	  trackGenerator = new MediaStreamTrackGenerator({kind: this.kind});
+	  const transformer = new TransformStream({
+		  async transform(videoFrame, controller) {
+			  videoFrame.close();
+			  controller.enqueue(videoFrame);
+		  },
+	  });
+	  return trackProcessor.readable.pipeThrough(transformer).pipeTo(trackGenerator.writable);
+  }
+
   /** current receive bits per second */
   get currentBitrate(): number {
     return this._currentBitrate;
   }
 
   get mediaStreamTrack() {
+	
     return this._mediaStreamTrack;
   }
 

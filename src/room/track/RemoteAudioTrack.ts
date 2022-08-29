@@ -1,4 +1,4 @@
-import { AudioReceiverStats, computeBitrate } from '../stats';
+import { AudioReceiverStats, computeBitrate, monitorFrequency } from '../stats';
 import RemoteTrack from './RemoteTrack';
 import { Track } from './Track';
 
@@ -63,6 +63,9 @@ export default class RemoteAudioTrack extends RemoteTrack {
     }
 
     this.prevStats = stats;
+    setTimeout(() => {
+      this.monitorReceiver();
+    }, monitorFrequency);
   };
 
   protected async getReceiverStats(): Promise<AudioReceiverStats | undefined> {

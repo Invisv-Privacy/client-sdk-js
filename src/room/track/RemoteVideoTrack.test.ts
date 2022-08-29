@@ -1,7 +1,7 @@
 import { TrackEvent } from '../events';
 import RemoteVideoTrack, { ElementInfo } from './RemoteVideoTrack';
 import MockMediaStreamTrack from '../../test/MockMediaStreamTrack';
-import type { Track } from './Track';
+import { Track } from './Track';
 
 jest.useFakeTimers();
 

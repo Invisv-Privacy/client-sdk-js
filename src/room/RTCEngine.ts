@@ -2,7 +2,7 @@ import { EventEmitter } from 'events';
 import type TypedEventEmitter from 'typed-emitter';
 import { SignalClient, SignalOptions } from '../api/SignalClient';
 import log from '../logger';
-import type { RoomOptions } from '../options';
+import { RoomOptions } from '../options';
 import {
   ClientConfigSetting,
   ClientConfiguration,
@@ -24,13 +24,8 @@ import DefaultReconnectPolicy from './DefaultReconnectPolicy';
 import { ConnectionError, TrackInvalidError, UnexpectedConnectionState } from './errors';
 import { EngineEvent } from './events';
 import PCTransport from './PCTransport';
-import type { ReconnectContext, ReconnectPolicy } from './ReconnectPolicy';
-import type LocalTrack from './track/LocalTrack';
-import type LocalVideoTrack from './track/LocalVideoTrack';
-import type { SimulcastTrackInfo } from './track/LocalVideoTrack';
-import type { TrackPublishOptions, VideoCodec } from './track/options';
-import { Track } from './track/Track';
-import { isWeb, sleep, supportsAddTrack, supportsTransceiver } from './utils';
+import { ReconnectContext, ReconnectPolicy } from './ReconnectPolicy';
+import { isWeb, sleep } from './utils';
 
 const lossyDataChannel = '_lossy';
 const reliableDataChannel = '_reliable';
@@ -246,6 +241,9 @@ export default class RTCEngine extends (EventEmitter as new () => TypedEventEmit
     this.rtcConfig.sdpSemantics = 'unified-plan';
     // @ts-ignore
     this.rtcConfig.continualGatheringPolicy = 'gather_continually';
+
+	// @ts-expect-error
+	this.rtcConfig.encodedInsertableStreams = true;
 
     this.publisher = new PCTransport(this.rtcConfig);
     this.subscriber = new PCTransport(this.rtcConfig);
@@ -479,142 +477,6 @@ export default class RTCEngine extends (EventEmitter as new () => TypedEventEmit
       log.error(`Unknown DataChannel Error on ${channelKind}`, event);
     }
   };
-
-  private setPreferredCodec(
-    transceiver: RTCRtpTransceiver,
-    kind: Track.Kind,
-    videoCodec: VideoCodec,
-  ) {
-    if (!('getCapabilities' in RTCRtpSender)) {
-      return;
-    }
-    const cap = RTCRtpSender.getCapabilities(kind);
-    if (!cap) return;
-    log.debug('get capabilities', cap);
-    const matched: RTCRtpCodecCapability[] = [];
-    const partialMatched: RTCRtpCodecCapability[] = [];
-    const unmatched: RTCRtpCodecCapability[] = [];
-    cap.codecs.forEach((c) => {
-      const codec = c.mimeType.toLowerCase();
-      if (codec === 'audio/opus') {
-        matched.push(c);
-        return;
-      }
-      const matchesVideoCodec = codec === `video/${videoCodec}`;
-      if (!matchesVideoCodec) {
-        unmatched.push(c);
-        return;
-      }
-      // for h264 codecs that have sdpFmtpLine available, use only if the
-      // profile-level-id is 42e01f for cross-browser compatibility
-      if (videoCodec === 'h264') {
-        if (c.sdpFmtpLine && c.sdpFmtpLine.includes('profile-level-id=42e01f')) {
-          matched.push(c);
-        } else {
-          partialMatched.push(c);
-        }
-        return;
-      }
-
-      matched.push(c);
-    });
-
-    if ('setCodecPreferences' in transceiver) {
-      transceiver.setCodecPreferences(matched.concat(partialMatched, unmatched));
-    }
-  }
-
-  async createSender(
-    track: LocalTrack,
-    opts: TrackPublishOptions,
-    encodings?: RTCRtpEncodingParameters[],
-  ) {
-    if (supportsTransceiver()) {
-      return this.createTransceiverRTCRtpSender(track, opts, encodings);
-    }
-    if (supportsAddTrack()) {
-      log.debug('using add-track fallback');
-      return this.createRTCRtpSender(track.mediaStreamTrack);
-    }
-    throw new UnexpectedConnectionState('Required webRTC APIs not supported on this device');
-  }
-
-  async createSimulcastSender(
-    track: LocalVideoTrack,
-    simulcastTrack: SimulcastTrackInfo,
-    opts: TrackPublishOptions,
-    encodings?: RTCRtpEncodingParameters[],
-  ) {
-    // store RTCRtpSender
-    // @ts-ignore
-    if (supportsTransceiver()) {
-      return this.createSimulcastTransceiverSender(track, simulcastTrack, opts, encodings);
-    }
-    if (supportsAddTrack()) {
-      log.debug('using add-track fallback');
-      return this.createRTCRtpSender(track.mediaStreamTrack);
-    }
-
-    throw new UnexpectedConnectionState('Cannot stream on this device');
-  }
-
-  private async createTransceiverRTCRtpSender(
-    track: LocalTrack,
-    opts: TrackPublishOptions,
-    encodings?: RTCRtpEncodingParameters[],
-  ) {
-    if (!this.publisher) {
-      throw new UnexpectedConnectionState('publisher is closed');
-    }
-
-    const transceiverInit: RTCRtpTransceiverInit = { direction: 'sendonly' };
-    if (encodings) {
-      transceiverInit.sendEncodings = encodings;
-    }
-    // addTransceiver for react-native is async. web is synchronous, but await won't effect it.
-    const transceiver = await this.publisher.pc.addTransceiver(
-      track.mediaStreamTrack,
-      transceiverInit,
-    );
-    if (track.kind === Track.Kind.Video && opts.videoCodec) {
-      this.setPreferredCodec(transceiver, track.kind, opts.videoCodec);
-      track.codec = opts.videoCodec;
-    }
-    return transceiver.sender;
-  }
-
-  private async createSimulcastTransceiverSender(
-    track: LocalVideoTrack,
-    simulcastTrack: SimulcastTrackInfo,
-    opts: TrackPublishOptions,
-    encodings?: RTCRtpEncodingParameters[],
-  ) {
-    if (!this.publisher) {
-      throw new UnexpectedConnectionState('publisher is closed');
-    }
-    const transceiverInit: RTCRtpTransceiverInit = { direction: 'sendonly' };
-    if (encodings) {
-      transceiverInit.sendEncodings = encodings;
-    }
-    // addTransceiver for react-native is async. web is synchronous, but await won't effect it.
-    const transceiver = await this.publisher.pc.addTransceiver(
-      simulcastTrack.mediaStreamTrack,
-      transceiverInit,
-    );
-    if (!opts.videoCodec) {
-      return;
-    }
-    this.setPreferredCodec(transceiver, track.kind, opts.videoCodec);
-    track.setSimulcastTrackSender(opts.videoCodec, transceiver.sender);
-    return transceiver.sender;
-  }
-
-  private async createRTCRtpSender(track: MediaStreamTrack) {
-    if (!this.publisher) {
-      throw new UnexpectedConnectionState('publisher is closed');
-    }
-    return this.publisher.pc.addTrack(track);
-  }
 
   // websocket reconnect behavior. if websocket is interrupted, and the PeerConnection
   // continues to work, we can reconnect to websocket to continue the session

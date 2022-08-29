@@ -1,6 +1,6 @@
 import { sleep } from '../utils';
-import type { AudioCaptureOptions, CreateLocalTracksOptions, VideoCaptureOptions } from './options';
-import type { AudioTrack } from './types';
+import { AudioCaptureOptions, CreateLocalTracksOptions, VideoCaptureOptions } from './options';
+import { AudioTrack } from './types';
 
 export function mergeDefaultOptions(
   options?: CreateLocalTracksOptions,
@@ -111,3 +111,4 @@ export function getNewAudioContext(): AudioContext | void {
     return new AudioContext();
   }
 }
+

@@ -1,12 +1,11 @@
 import { TrackEvent } from '../events';
 import { monitorFrequency } from '../stats';
 import { Track } from './Track';
+import { decodeFunction } from './ee2e'
 
 export default abstract class RemoteTrack extends Track {
   /** @internal */
   receiver?: RTCRtpReceiver;
-
-  monitorInterval?: ReturnType<typeof setInterval>;
 
   constructor(
     mediaTrack: MediaStreamTrack,
@@ -17,6 +16,16 @@ export default abstract class RemoteTrack extends Track {
     super(mediaTrack, kind);
     this.sid = sid;
     this.receiver = receiver;
+  }
+
+
+  decryptTrack() {
+	  // @ts-expect-error
+	  const receiverStreams = this.receiver.createEncodedStreams()
+	  const transformer = new TransformStream({
+		  transform: decodeFunction,
+	  });
+	  receiverStreams.readable.pipeThrough(transformer).pipeTo(receiverStreams.writable); 
   }
 
   /** @internal */
@@ -48,23 +57,15 @@ export default abstract class RemoteTrack extends Track {
   }
 
   stop() {
-    this.stopMonitor();
     // use `enabled` of track to enable re-use of transceiver
     super.disable();
   }
 
   /* @internal */
   startMonitor() {
-    if (!this.monitorInterval) {
-      this.monitorInterval = setInterval(() => this.monitorReceiver(), monitorFrequency);
-    }
-  }
-
-  /* @internal */
-  stopMonitor() {
-    if (this.monitorInterval) {
-      clearInterval(this.monitorInterval);
-    }
+    setTimeout(() => {
+      this.monitorReceiver();
+    }, monitorFrequency);
   }
 
   protected abstract monitorReceiver(): void;

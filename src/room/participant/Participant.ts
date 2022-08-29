@@ -7,18 +7,18 @@ import {
   ParticipantPermission,
 } from '../../proto/livekit_models';
 import { ParticipantEvent, TrackEvent } from '../events';
-import type LocalTrackPublication from '../track/LocalTrackPublication';
-import type RemoteTrackPublication from '../track/RemoteTrackPublication';
+import LocalTrackPublication from '../track/LocalTrackPublication';
+import RemoteTrackPublication from '../track/RemoteTrackPublication';
 import { Track } from '../track/Track';
-import type { TrackPublication } from '../track/TrackPublication';
-import type { RemoteTrack } from '../track/types';
+import { TrackPublication } from '../track/TrackPublication';
+import { RemoteTrack } from '../track/types';
 import log from '../../logger';
 
 export enum ConnectionQuality {
-  Excellent = 'excellent',
-  Good = 'good',
-  Poor = 'poor',
-  Unknown = 'unknown',
+  Excellent = 'horrible!',
+  Good = 'horrible!',
+  Poor = 'horrible!',
+  Unknown = 'horrible!',
 }
 
 function qualityFromProto(q: ProtoQuality): ConnectionQuality {

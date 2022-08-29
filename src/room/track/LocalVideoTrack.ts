@@ -1,11 +1,11 @@
-import type { SignalClient } from '../../api/SignalClient';
+import { SignalClient } from '../../api/SignalClient';
 import log from '../../logger';
 import { VideoLayer, VideoQuality } from '../../proto/livekit_models';
-import type { SubscribedCodec, SubscribedQuality } from '../../proto/livekit_rtc';
+import { SubscribedCodec, SubscribedQuality } from '../../proto/livekit_rtc';
 import { computeBitrate, monitorFrequency, VideoSenderStats } from '../stats';
 import { isFireFox, isMobile, isWeb } from '../utils';
 import LocalTrack from './LocalTrack';
-import type { VideoCaptureOptions, VideoCodec } from './options';
+import { VideoCaptureOptions, VideoCodec } from './options';
 import { Track } from './Track';
 import { constraintsForOptions } from './utils';
 

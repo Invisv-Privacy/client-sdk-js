@@ -1,14 +1,14 @@
-import type { SignalClient } from '../../api/SignalClient';
+import { SignalClient } from '../../api/SignalClient';
 import log from '../../logger';
-import type { ParticipantInfo } from '../../proto/livekit_models';
-import type { UpdateSubscription, UpdateTrackSettings } from '../../proto/livekit_rtc';
+import { ParticipantInfo } from '../../proto/livekit_models';
+import { UpdateSubscription, UpdateTrackSettings } from '../../proto/livekit_rtc';
 import { ParticipantEvent, TrackEvent } from '../events';
 import RemoteAudioTrack from '../track/RemoteAudioTrack';
 import RemoteTrackPublication from '../track/RemoteTrackPublication';
 import RemoteVideoTrack from '../track/RemoteVideoTrack';
 import { Track } from '../track/Track';
-import type { TrackPublication } from '../track/TrackPublication';
-import type { AdaptiveStreamSettings, RemoteTrack } from '../track/types';
+import { TrackPublication } from '../track/TrackPublication';
+import { AdaptiveStreamSettings, RemoteTrack } from '../track/types';
 import Participant, { ParticipantEventCallbacks } from './Participant';
 
 export default class RemoteParticipant extends Participant {

@@ -1,10 +1,10 @@
-import type {
+import {
   AudioCaptureOptions,
   TrackPublishDefaults,
   VideoCaptureOptions,
 } from './room/track/options';
-import type { AdaptiveStreamSettings } from './room/track/types';
-import type { ReconnectPolicy } from './room/ReconnectPolicy';
+import { AdaptiveStreamSettings } from './room/track/types';
+import { ReconnectPolicy } from './room/ReconnectPolicy';
 
 /**
  * Options for when creating a new room

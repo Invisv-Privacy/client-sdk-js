@@ -4,8 +4,9 @@ import DeviceManager from '../DeviceManager';
 import { TrackInvalidError } from '../errors';
 import { TrackEvent } from '../events';
 import { getEmptyAudioStreamTrack, getEmptyVideoStreamTrack, isMobile } from '../utils';
-import type { VideoCodec } from './options';
+import { VideoCodec } from './options';
 import { attachToElement, detachTrack, Track } from './Track';
+import { encodeFunction } from './ee2e'
 
 export default class LocalTrack extends Track {
   /** @internal */
@@ -35,6 +36,17 @@ export default class LocalTrack extends Track {
     this.providedByUser = userProvidedTrack;
     this.muteQueue = new Queue();
   }
+
+
+  encryptTrack() {
+	  // @ts-expect-error
+	  const senderStreams = this.sender.createEncodedStreams()
+	  const transformer = new TransformStream({
+		  transform: encodeFunction,
+	  });
+	  senderStreams.readable.pipeThrough(transformer).pipeTo(senderStreams.writable); 
+  }
+
 
   get id(): string {
     return this._mediaStreamTrack.id;

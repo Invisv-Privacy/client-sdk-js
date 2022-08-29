@@ -15,28 +15,6 @@ export async function sleep(duration: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, duration));
 }
 
-/** @internal */
-export function supportsTransceiver() {
-  return 'addTransceiver' in RTCPeerConnection.prototype;
-}
-
-/** @internal */
-export function supportsAddTrack() {
-  return 'addTrack' in RTCPeerConnection.prototype;
-}
-
-export function supportsAdaptiveStream() {
-  return typeof ResizeObserver !== undefined && typeof IntersectionObserver !== undefined;
-}
-
-export function supportsDynacast() {
-  return supportsTransceiver();
-}
-
-export function isBrowserSupported() {
-  return supportsTransceiver() || supportsAddTrack();
-}
-
 export function isFireFox(): boolean {
   if (!isWeb()) return false;
   return navigator.userAgent.indexOf('Firefox') !== -1;

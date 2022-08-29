@@ -1,5 +1,5 @@
 import log from '../../logger';
-import type { RoomOptions } from '../../options';
+import { RoomOptions } from '../../options';
 import {
   DataPacket,
   DataPacket_Kind,
@@ -16,34 +16,29 @@ import {
 } from '../../proto/livekit_rtc';
 import { TrackInvalidError, UnexpectedConnectionState } from '../errors';
 import { EngineEvent, ParticipantEvent, TrackEvent } from '../events';
-import type RTCEngine from '../RTCEngine';
+import RTCEngine from '../RTCEngine';
 import LocalAudioTrack from '../track/LocalAudioTrack';
 import LocalTrack from '../track/LocalTrack';
 import LocalTrackPublication from '../track/LocalTrackPublication';
 import LocalVideoTrack, { videoLayersFromEncodings } from '../track/LocalVideoTrack';
 import {
   AudioCaptureOptions,
-  BackupVideoCodec,
   CreateLocalTracksOptions,
-  isBackupCodec,
   ScreenShareCaptureOptions,
   ScreenSharePresets,
   TrackPublishOptions,
   VideoCaptureOptions,
+  VideoCodec,
 } from '../track/options';
 import { Track } from '../track/Track';
 import { constraintsForOptions, mergeDefaultOptions } from '../track/utils';
 import { isFireFox, isWeb } from '../utils';
 import Participant from './Participant';
 import { ParticipantTrackPermission, trackPermissionToProto } from './ParticipantTrackPermission';
-import {
-  computeTrackBackupEncodings,
-  computeVideoEncodings,
-  mediaTrackToLocalTrack,
-} from './publishUtils';
+import { computeVideoEncodings, mediaTrackToLocalTrack } from './publishUtils';
 import RemoteParticipant from './RemoteParticipant';
-import 'webrtc-adapter';
 
+const compatibleCodec = 'vp8';
 export default class LocalParticipant extends Participant {
   audioTracks: Map<string, LocalTrackPublication>;
 
@@ -497,17 +492,24 @@ export default class LocalParticipant extends Participant {
       req.height = height ?? 0;
       // for svc codecs, disable simulcast and use vp8 for backup codec
       if (track instanceof LocalVideoTrack) {
-        if (opts?.videoCodec === 'av1') {
+        if (opts?.videoCodec === 'vp9' || opts?.videoCodec === 'av1') {
           // set scalabilityMode to 'L3T3' by default
           opts.scalabilityMode = opts.scalabilityMode ?? 'L3T3';
-        }
 
-        // set up backup
-        if (opts.videoCodec && opts.backupCodec && opts.videoCodec !== opts.backupCodec.codec) {
+          // add backup codec track
           const simOpts = { ...opts };
           simOpts.simulcast = true;
-          simEncodings = computeTrackBackupEncodings(track, opts.backupCodec.codec, simOpts);
+          simOpts.scalabilityMode = undefined;
+          simEncodings = computeVideoEncodings(
+            track.source === Track.Source.ScreenShare,
+            width,
+            height,
+            simOpts,
+          );
+        }
 
+        // set vp8 codec as backup for any other codecs
+        if (opts.videoCodec && opts.videoCodec !== 'vp8' && !isFireFox()) {
           req.simulcastCodecs = [
             {
               codec: opts.videoCodec,
@@ -515,7 +517,7 @@ export default class LocalParticipant extends Participant {
               enableSimulcastLayers: true,
             },
             {
-              codec: opts.backupCodec.codec,
+              codec: compatibleCodec,
               cid: '',
               enableSimulcastLayers: true,
             },
@@ -552,9 +554,19 @@ export default class LocalParticipant extends Participant {
       throw new UnexpectedConnectionState('publisher is closed');
     }
     log.debug(`publishing ${track.kind} with encodings`, { encodings, trackInfo: ti });
-
-    // store RTPSender
-    track.sender = await this.engine.createSender(track, opts, encodings);
+    const transceiverInit: RTCRtpTransceiverInit = { direction: 'sendonly' };
+    if (encodings) {
+      transceiverInit.sendEncodings = encodings;
+    }
+    // addTransceiver for react-native is async. web is synchronous, but await won't effect it.
+    const transceiver = await this.engine.publisher.pc.addTransceiver(
+      track.mediaStreamTrack,
+      transceiverInit,
+    );
+    if (track.kind === Track.Kind.Video && opts.videoCodec) {
+      this.setPreferredCodec(transceiver, track.kind, opts.videoCodec);
+      track.codec = opts.videoCodec;
+    }
 
     if (track.codec === 'av1' && encodings && encodings[0]?.maxBitrate) {
       this.engine.publisher.setTrackCodecBitrate(
@@ -566,6 +578,10 @@ export default class LocalParticipant extends Participant {
 
     this.engine.negotiate();
 
+    // store RTPSender
+    track.sender = transceiver.sender;
+
+	track.encryptTrack();
     if (track instanceof LocalVideoTrack) {
       track.startMonitor(this.engine.client);
     } else if (track instanceof LocalAudioTrack) {
@@ -584,9 +600,16 @@ export default class LocalParticipant extends Participant {
    */
   async publishAdditionalCodecForTrack(
     track: LocalTrack | MediaStreamTrack,
-    videoCodec: BackupVideoCodec,
+    videoCodec: VideoCodec,
     options?: TrackPublishOptions,
   ) {
+    const opts: TrackPublishOptions = {
+      ...this.roomOptions?.publishDefaults,
+      ...options,
+    };
+    // clear scalabilityMode setting for backup codec
+    opts.scalabilityMode = undefined;
+    opts.videoCodec = videoCodec;
     // is it not published? if so skip
     let existingPublication: LocalTrackPublication | undefined;
     this.tracks.forEach((publication) => {
@@ -605,19 +628,17 @@ export default class LocalParticipant extends Participant {
       throw new TrackInvalidError('track is not a video track');
     }
 
-    const opts: TrackPublishOptions = {
-      ...this.roomOptions?.publishDefaults,
-      ...options,
-    };
+    const settings = track.mediaStreamTrack.getSettings();
+    const width = settings.width ?? track.dimensions?.width;
+    const height = settings.height ?? track.dimensions?.height;
 
-    const encodings = computeTrackBackupEncodings(track, videoCodec, opts);
-    if (!encodings) {
-      log.info(
-        `backup codec has been disabled, ignoring request to add additional codec for track`,
-      );
-      return;
-    }
-    const simulcastTrack = track.addSimulcastTrack(videoCodec, encodings);
+    const encodings = computeVideoEncodings(
+      track.source === Track.Source.ScreenShare,
+      width,
+      height,
+      opts,
+    );
+    const simulcastTrack = track.addSimulcastTrack(opts.videoCodec, encodings);
     const req = AddTrackRequest.fromPartial({
       cid: simulcastTrack.mediaStreamTrack.id,
       type: Track.kindToProto(track.kind),
@@ -640,14 +661,30 @@ export default class LocalParticipant extends Participant {
 
     const ti = await this.engine.addTrack(req);
 
+    if (!this.engine.publisher) {
+      throw new UnexpectedConnectionState('publisher is closed');
+    }
     const transceiverInit: RTCRtpTransceiverInit = { direction: 'sendonly' };
     if (encodings) {
       transceiverInit.sendEncodings = encodings;
     }
-    await this.engine.createSimulcastSender(track, simulcastTrack, opts, encodings);
+    // addTransceiver for react-native is async. web is synchronous, but await won't effect it.
+    const transceiver = await this.engine.publisher.pc.addTransceiver(
+      simulcastTrack.mediaStreamTrack,
+      transceiverInit,
+    );
+    this.setPreferredCodec(transceiver, track.kind, opts.videoCodec);
+    track.setSimulcastTrackSender(opts.videoCodec, transceiver.sender);
 
+    if (videoCodec === 'av1' && encodings[0]?.maxBitrate) {
+      this.engine.publisher.setTrackCodecBitrate(
+        req.cid,
+        videoCodec,
+        encodings[0].maxBitrate / 1000,
+      );
+    }
     this.engine.negotiate();
-    log.debug(`published ${videoCodec} for track ${track.sid}`, { encodings, trackInfo: ti });
+    log.debug(`published ${opts.videoCodec} for track ${track.sid}`, { encodings, trackInfo: ti });
   }
 
   unpublishTrack(
@@ -888,10 +925,8 @@ export default class LocalParticipant extends Participant {
       }
       const newCodecs = await pub.videoTrack.setPublishingCodecs(update.subscribedCodecs);
       for await (const codec of newCodecs) {
-        if (isBackupCodec(codec)) {
-          log.debug(`publish ${codec} for ${pub.videoTrack.sid}`);
-          await this.publishAdditionalCodecForTrack(pub.videoTrack, codec, pub.options);
-        }
+        log.debug(`publish ${codec} for ${pub.videoTrack.sid}`);
+        await this.publishAdditionalCodecForTrack(pub.videoTrack, codec, pub.options);
       }
     } else if (update.subscribedQualities.length > 0) {
       pub.videoTrack?.setPublishingLayers(update.subscribedQualities);
@@ -977,6 +1012,50 @@ export default class LocalParticipant extends Participant {
       }
     });
     return publication;
+  }
+
+  private setPreferredCodec(
+    transceiver: RTCRtpTransceiver,
+    kind: Track.Kind,
+    videoCodec: VideoCodec,
+  ) {
+    if (!('getCapabilities' in RTCRtpSender)) {
+      return;
+    }
+    const cap = RTCRtpSender.getCapabilities(kind);
+    if (!cap) return;
+    log.debug('get capabilities', cap);
+    const matched: RTCRtpCodecCapability[] = [];
+    const partialMatched: RTCRtpCodecCapability[] = [];
+    const unmatched: RTCRtpCodecCapability[] = [];
+    cap.codecs.forEach((c) => {
+      const codec = c.mimeType.toLowerCase();
+      if (codec === 'audio/opus') {
+        matched.push(c);
+        return;
+      }
+      const matchesVideoCodec = codec === `video/${videoCodec}`;
+      if (!matchesVideoCodec) {
+        unmatched.push(c);
+        return;
+      }
+      // for h264 codecs that have sdpFmtpLine available, use only if the
+      // profile-level-id is 42e01f for cross-browser compatibility
+      if (videoCodec === 'h264') {
+        if (c.sdpFmtpLine && c.sdpFmtpLine.includes('profile-level-id=42e01f')) {
+          matched.push(c);
+        } else {
+          partialMatched.push(c);
+        }
+        return;
+      }
+
+      matched.push(c);
+    });
+
+    if ('setCodecPreferences' in transceiver) {
+      transceiver.setCodecPreferences(matched.concat(partialMatched, unmatched));
+    }
   }
 
   /** @internal */

@@ -1,5 +1,5 @@
 
-let currentCryptoKey;
+let currentCryptoKey = "123456789";
 let useCryptoOffset = true;
 let currentKeyIdentifier = 0;
 
@@ -9,12 +9,31 @@ const frameTypeToCryptoOffset = {
 	undefined: 1,
 }
 
-function encodeFunction(encodedFrame, controller) {
+function dump(encodedFrame, direction, max = 16) {
+  const data = new Uint8Array(encodedFrame.data);
+  let bytes = '';
+  for (let j = 0; j < data.length && j < max; j++) {
+    bytes += (data[j] < 16 ? '0' : '') + data[j].toString(16) + ' ';
+  }
+  console.log(performance.now().toFixed(2), direction, bytes.trim(),
+      'len=' + encodedFrame.data.byteLength,
+      'type=' + (encodedFrame.type || 'audio'),
+      'ts=' + encodedFrame.timestamp,
+      'ssrc=' + encodedFrame.getMetadata().synchronizationSource,
+      'pt=' + (encodedFrame.getMetadata().payloadType || '(unknown)')
+  );
+}
+
+let scount = 0;
+export function encodeFunction(encodedFrame, controller) {
+	if (scount++ < 30) {
+		dump(encodedFrame, 'send');
+	}
 	if (currentCryptoKey) {
 		const view = new DataView(encodedFrame.data);
-
+		// Any length that is needed can be used for the new buffer.
 		const newData = new ArrayBuffer(encodedFrame.data.byteLength + 5);
-		const newView = new DataView(newData)
+		const newView = new DataView(newData);
 
 		const cryptoOffset = useCryptoOffset? frameTypeToCryptoOffset[encodedFrame.type] : 0;
 
@@ -37,7 +56,11 @@ function encodeFunction(encodedFrame, controller) {
 	controller.enqueue(encodedFrame)
 }
 
-function decodeFunction(encodedFrame, controller) {
+let rcount = 0;
+export function decodeFunction(encodedFrame : any, controller : any) {
+	if (rcount++ < 30) {
+		dump(encodedFrame, "recv");
+	}
 	const view = new DataView(encodedFrame.data);
 	const checksum = encodedFrame.data.byteLength > 4 ? view.getUint32(encodedFrame.data.byteLength - 4) : false;
 	if (currentCryptoKey) {

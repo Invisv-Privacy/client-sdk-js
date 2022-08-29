@@ -13,7 +13,7 @@
     "forceConsistentCasingInFileNames": true /* Disallow inconsistently-cased references to the same file. */,
     "moduleResolution": "node",
     "resolveJsonModule": true,
-    "importsNotUsedAsValues": "error"
+	"noImplicitAny": false
   },
   "exclude": ["dist", "**/*.test.ts"],
   "include": ["src/**/*"],

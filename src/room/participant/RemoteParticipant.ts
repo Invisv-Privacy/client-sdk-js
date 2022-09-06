@@ -171,6 +171,8 @@ export default class RemoteParticipant extends Participant {
     track.setMediaStream(mediaStream);
     track.start();
 
+    track.decryptTrack();
+
     publication.setTrack(track);
     // set participant volume on new microphone tracks
     if (

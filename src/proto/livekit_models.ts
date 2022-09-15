@@ -335,6 +335,11 @@ export interface ParticipantInfo {
    * and can publish to the server
    */
   isPublisher: boolean;
+
+  /**
+   * optional e2ee password
+   */
+  e2eePassword?: string;
 }
 
 export enum ParticipantInfo_State {

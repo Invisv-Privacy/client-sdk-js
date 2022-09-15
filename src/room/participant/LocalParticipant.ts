@@ -395,6 +395,25 @@ export default class LocalParticipant extends Participant {
     return localTracks;
   }
 
+  updatePassword(password: string) {
+    if (this.roomOptions?.e2ePassword !== password) {
+      if (this.roomOptions) {
+        this.roomOptions.e2ePassword = password;
+
+        const {
+          roomOptions: { e2ePassword },
+        } = this;
+
+        if (e2ePassword) {
+          this.tracks.forEach((trackPublication) => {
+            trackPublication.track?.setPassword(e2ePassword);
+            trackPublication.track?.unmute();
+          });
+        }
+      }
+    }
+  }
+
   /**
    * Publish a new track to the room
    * @param track
@@ -560,6 +579,10 @@ export default class LocalParticipant extends Participant {
 
     // store RTPSender
     track.sender = await this.engine.createSender(track, opts, encodings);
+
+    if (this.roomOptions?.e2ePassword) {
+      track.initializeEncryption(this.roomOptions?.e2ePassword);
+    }
 
     if (track.codec === 'av1' && encodings && encodings[0]?.maxBitrate) {
       this.engine.publisher.setTrackCodecBitrate(

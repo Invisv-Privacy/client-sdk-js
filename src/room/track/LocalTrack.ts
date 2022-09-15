@@ -6,6 +6,8 @@ import { TrackEvent } from '../events';
 import { getEmptyAudioStreamTrack, getEmptyVideoStreamTrack, isMobile } from '../utils';
 import type { VideoCodec } from './options';
 import { attachToElement, detachTrack, Track } from './Track';
+// @ts-ignore
+import Worker from 'web-worker:../../worker/worker';
 
 export default abstract class LocalTrack extends Track {
   /** @internal */
@@ -13,6 +15,10 @@ export default abstract class LocalTrack extends Track {
 
   /** @internal */
   codec?: VideoCodec;
+
+  worker: any;
+
+  e2eePassword?: string;
 
   protected constraints: MediaTrackConstraints;
 
@@ -41,6 +47,27 @@ export default abstract class LocalTrack extends Track {
     this.reacquireTrack = false;
     this.providedByUser = userProvidedTrack;
     this.muteQueue = new Queue();
+    this.worker = new Worker();
+  }
+
+  initializeEncryption(password: string) {
+    this.setPassword(password);
+    this.encryptTrack();
+  }
+
+  setPassword(password: string) {
+    this.e2eePassword = password;
+    this.worker.postMessage({ operation: 'setPassword', password });
+  }
+
+  encryptTrack() {
+    try {
+      // @ts-expect-error
+      const { readable, writable } = this.sender.createEncodedStreams();
+      this.worker.postMessage({ operation: 'encode', readable, writable }, [readable, writable]);
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   get id(): string {
@@ -170,6 +197,10 @@ export default abstract class LocalTrack extends Track {
       await this.sender.replaceTrack(newTrack);
     }
 
+    if (this.e2eePassword) {
+      this.initializeEncryption(this.e2eePassword);
+    }
+
     this._mediaStreamTrack = newTrack;
 
     await this.resumeUpstream();
@@ -193,6 +224,10 @@ export default abstract class LocalTrack extends Track {
     this.isMuted = muted;
     this._mediaStreamTrack.enabled = !muted;
     this.emit(muted ? TrackEvent.Muted : TrackEvent.Unmuted, this);
+
+    if (!this.isMuted) {
+      this.encryptTrack();
+    }
   }
 
   protected get needsReAcquisition(): boolean {

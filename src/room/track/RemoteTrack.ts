@@ -1,10 +1,16 @@
 import { TrackEvent } from '../events';
 import { monitorFrequency } from '../stats';
 import { Track } from './Track';
+// @ts-ignore
+import Worker from 'web-worker:../../worker/worker';
 
 export default abstract class RemoteTrack extends Track {
   /** @internal */
   receiver?: RTCRtpReceiver;
+
+  worker: any;
+
+  e2eePassword?: string;
 
   constructor(
     mediaTrack: MediaStreamTrack,
@@ -15,6 +21,27 @@ export default abstract class RemoteTrack extends Track {
     super(mediaTrack, kind);
     this.sid = sid;
     this.receiver = receiver;
+    this.worker = new Worker();
+  }
+
+  initializeEncryption(password: string) {
+    this.setPassword(password);
+    this.decryptTrack();
+  }
+
+  decryptTrack() {
+    try {
+      // @ts-expect-error
+      const { readable, writable } = this.receiver.createEncodedStreams();
+      this.worker.postMessage({ operation: 'decode', readable, writable }, [readable, writable]);
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  setPassword(password: string) {
+    this.e2eePassword = password;
+    this.worker.postMessage({ operation: 'setPassword', password });
   }
 
   /** @internal */

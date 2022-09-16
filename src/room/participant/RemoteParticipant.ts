@@ -51,6 +51,8 @@ export default class RemoteParticipant extends Participant {
     this.audioTracks = new Map();
     this.videoTracks = new Map();
     this.e2eePassword = e2eePassword;
+
+    console.log('RemoteParticipant constructor', this.e2eePassword);
   }
 
   protected addTrackPublication(publication: RemoteTrackPublication) {
@@ -188,6 +190,7 @@ export default class RemoteParticipant extends Participant {
     track.setMediaStream(mediaStream);
     track.start();
 
+    console.log('RemoteParticipant', this.e2eePassword);
     if (this.e2eePassword) {
       track.initializeEncryption(this.e2eePassword);
     }
@@ -293,6 +296,7 @@ export default class RemoteParticipant extends Participant {
       }
     });
 
+    console.log('in updateInfo', info);
     if (this.e2eePassword !== info.e2eePassword) {
       this.e2eePassword = info.e2eePassword;
       const { e2eePassword } = this;

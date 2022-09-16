@@ -51,6 +51,7 @@ async function generateKey(password: string) {
 
 export default class E2EEManager {
   currentCryptoKey?: CryptoKey;
+  currentPassword?: string;
   useCryptoOffset: Boolean;
   currentKeyIdentifier: number;
   sendCounts: Map<String, number>;
@@ -66,8 +67,10 @@ export default class E2EEManager {
 
   async setKey(password: string) {
     if (password !== '') {
+      console.log('setKey', password);
       const key = await generateKey(password);
       this.currentCryptoKey = key;
+      this.currentPassword = password;
     } else {
       delete this.currentCryptoKey;
     }
@@ -77,6 +80,7 @@ export default class E2EEManager {
     // if (scount++ < 30) {
     //   dump(encodedFrame, 'send');
     // }
+    // console.log('encodeFunction', this.currentPassword);
     if (this.currentCryptoKey && encodedFrame.data.byteLength > 0) {
       try {
         const iv = this.makeIV(
@@ -159,6 +163,7 @@ export default class E2EEManager {
     // const view = new DataView(encodedFrame.data);
     // const checksum =
     // encodedFrame.data.byteLength > 4 ? view.getUint32(encodedFrame.data.byteLength - 4) : false;
+    // console.log('decodeFunction', this.currentPassword);
     if (this.currentCryptoKey && encodedFrame.data.byteLength > 0) {
       try {
         const frameHeader = new Uint8Array(

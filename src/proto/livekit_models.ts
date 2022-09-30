@@ -227,6 +227,7 @@ export enum DisconnectReason {
   ROOM_DELETED = 5,
   STATE_MISMATCH = 6,
   JOIN_FAILURE = 7,
+  CAPACITY_REACHED = 8,
   UNRECOGNIZED = -1,
 }
 

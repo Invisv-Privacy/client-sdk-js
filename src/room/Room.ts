@@ -313,7 +313,7 @@ class Room extends (EventEmitter as new () => TypedEmitter<RoomEventCallbacks>) 
       } catch (err) {
         this.recreateEngine();
         this.handleDisconnect(this.options.stopLocalTrackOnUnpublish);
-        reject(new ConnectionError('could not establish signal connection'));
+        reject(new ConnectionError('could not establish signal connection: ' + String(err)));
         return;
       }
 

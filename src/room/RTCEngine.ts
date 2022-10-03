@@ -298,12 +298,21 @@ export default class RTCEngine extends (EventEmitter as new () => TypedEventEmit
 
     this.publisher.pc.onicecandidate = (ev) => {
       if (!ev.candidate) return;
-      log.trace('adding ICE candidate for peer', ev.candidate);
+      if (ev.candidate.type !== 'relay') {
+        log.info('not sending non-relay type ICE candidate for peer publisher', ev.candidate);
+        return;
+      }
+      log.trace('adding ICE candidate for peer publisher', ev.candidate);
       this.client.sendIceCandidate(ev.candidate, SignalTarget.PUBLISHER);
     };
 
     this.subscriber.pc.onicecandidate = (ev) => {
       if (!ev.candidate) return;
+      if (ev.candidate.type !== 'relay') {
+        log.info('not sending non-relay type ICE candidate for peer subscriber', ev.candidate);
+        return;
+      }
+      log.trace('adding ICE candidate for peer subscriber', ev.candidate);
       this.client.sendIceCandidate(ev.candidate, SignalTarget.SUBSCRIBER);
     };
 

@@ -119,6 +119,9 @@ export default class PCTransport extends EventEmitter {
 
     const sdpParsed = parse(offer.sdp ?? '');
     sdpParsed.media.forEach((media) => {
+      const newCandidates = media.candidates?.filter(candidate => candidate.type === 'relay');
+      media.candidates = newCandidates;
+
       if (media.type === 'audio') {
         ensureAudioNackAndStereo(media, [], []);
       } else if (media.type === 'video') {

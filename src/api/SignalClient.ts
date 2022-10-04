@@ -265,12 +265,11 @@ export class SignalClient {
             resolve(resp.message.join);
           } else if (resp.message?.$case === 'leave') {
             if (resp.message.leave.reason === DisconnectReason.CAPACITY_REACHED) {
-              reject(new ConnectionError('room has reached maximum capacity'))
+              reject(new ConnectionError('room has reached maximum capacity'));
             } else {
-              reject(new ConnectionError('got leave response instead of join'))
+              reject(new ConnectionError('got leave response instead of join'));
             }
-          }
-          else {
+          } else {
             reject(new ConnectionError('did not receive join response'));
           }
           return;

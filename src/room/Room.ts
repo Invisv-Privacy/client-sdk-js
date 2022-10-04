@@ -328,10 +328,10 @@ class Room extends (EventEmitter as new () => TypedEmitter<RoomEventCallbacks>) 
           const now = new Date();
           const utcMilllisecondsSinceEpoch = now.getTime(); //+ (now.getTimezoneOffset() * 60 * 1000);
           const utcSecondsSinceEpoch = Math.round(utcMilllisecondsSinceEpoch / 1000);
-          this.roomTimeRemaining = (joinResponse.room!.roomTimeout) - (
-              utcSecondsSinceEpoch - joinResponse.room!.creationTime
-            );
-          console.log("Set roomTimeRemaining: %d", this.roomTimeRemaining);
+          this.roomTimeRemaining =
+            joinResponse.room!.roomTimeout -
+            (utcSecondsSinceEpoch - joinResponse.room!.creationTime);
+          log.info('Set roomTimeRemaining', { roomTimeRemaining: this.roomTimeRemaining });
         }
         this.emit(RoomEvent.SignalConnected);
       } catch (err) {

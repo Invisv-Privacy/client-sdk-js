@@ -58,7 +58,7 @@ export interface InternalRoomOptions {
   /**
    * policy to use when attempting to reconnect
    */
-  reconnectPolicy?: ReconnectPolicy;
+  reconnectPolicy: ReconnectPolicy;
 
   /**
    * password to use for e2e encryption

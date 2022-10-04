@@ -1,4 +1,3 @@
 [submodule "protocol"]
 	path = protocol
 	url = https://github.com/Invisv-Privacy/livekit-protocol
-	branch = room_timeout

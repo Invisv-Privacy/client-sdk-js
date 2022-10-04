@@ -113,6 +113,9 @@ class Room extends (EventEmitter as new () => TypedEmitter<RoomEventCallbacks>) 
   /** room metadata */
   metadata: string | undefined = undefined;
 
+  /** room time remaining */
+  roomTimeRemaining: number = 0;
+
   /** options of room */
   options: InternalRoomOptions;
 
@@ -392,6 +395,15 @@ class Room extends (EventEmitter as new () => TypedEmitter<RoomEventCallbacks>) 
         if (this._isRecording !== joinResponse.room!.activeRecording) {
           this._isRecording = joinResponse.room!.activeRecording;
           this.emit(RoomEvent.RecordingStatusChanged, joinResponse.room!.activeRecording);
+        }
+        if (joinResponse.room!.roomTimeout > 0) {
+          const now = new Date();
+          const utcMilllisecondsSinceEpoch = now.getTime(); //+ (now.getTimezoneOffset() * 60 * 1000);
+          const utcSecondsSinceEpoch = Math.round(utcMilllisecondsSinceEpoch / 1000);
+          this.roomTimeRemaining =
+            joinResponse.room!.roomTimeout -
+            (utcSecondsSinceEpoch - joinResponse.room!.creationTime);
+          log.info('Set roomTimeRemaining', { roomTimeRemaining: this.roomTimeRemaining });
         }
         this.emit(RoomEvent.SignalConnected);
       } catch (err) {

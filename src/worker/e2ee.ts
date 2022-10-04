@@ -19,7 +19,7 @@ const ENCRYPTION_ALGORITHM = 'AES-GCM';
  packet. See https://developer.mozilla.org/en-US/docs/Web/API/AesGcmParams */
 const IV_LENGTH = 12;
 
-export function dump(encodedFrame, direction, max = 16) {
+export function dump(encodedFrame: any, direction: any, max = 16) {
   const data = new Uint8Array(encodedFrame.data);
   let bytes = '';
   for (let j = 0; j < data.length && j < max; j++) {
@@ -54,7 +54,7 @@ export default class E2EEManager {
   currentPassword?: string;
   useCryptoOffset: Boolean;
   currentKeyIdentifier: number;
-  sendCounts: Map<String, number>;
+  sendCounts: Map<number, number>;
 
   constructor() {
     this.useCryptoOffset = true;
@@ -76,6 +76,7 @@ export default class E2EEManager {
     }
   }
 
+  // @ts-expect-error
   encodeFunction(encodedFrame, controller) {
     // if (scount++ < 30) {
     //   dump(encodedFrame, 'send');
@@ -92,6 +93,7 @@ export default class E2EEManager {
         const frameHeader = new Uint8Array(
           encodedFrame.data,
           0,
+          // @ts-expect-error
           UNENCRYPTED_BYTES[encodedFrame.type],
         );
 
@@ -117,6 +119,7 @@ export default class E2EEManager {
               additionalData: new Uint8Array(encodedFrame.data, 0, frameHeader.byteLength),
             },
             this.currentCryptoKey,
+            // @ts-expect-error
             new Uint8Array(encodedFrame.data, UNENCRYPTED_BYTES[encodedFrame.type]),
           )
           .then(
@@ -169,6 +172,7 @@ export default class E2EEManager {
         const frameHeader = new Uint8Array(
           encodedFrame.data,
           0,
+          // @ts-expect-error
           UNENCRYPTED_BYTES[encodedFrame.type],
         );
         const frameTrailer = new Uint8Array(encodedFrame.data, encodedFrame.data.byteLength - 2, 2);
@@ -228,7 +232,7 @@ export default class E2EEManager {
    *
    * See also https://developer.mozilla.org/en-US/docs/Web/API/AesGcmParams
    */
-  makeIV(synchronizationSource, timestamp) {
+  makeIV(synchronizationSource: number, timestamp: number) {
     const iv = new ArrayBuffer(IV_LENGTH);
     const ivView = new DataView(iv);
 

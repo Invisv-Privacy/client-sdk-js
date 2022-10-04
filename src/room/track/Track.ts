@@ -5,9 +5,6 @@ import { TrackSource, TrackType } from '../../proto/livekit_models';
 import { StreamState as ProtoStreamState } from '../../proto/livekit_rtc';
 import { TrackEvent } from '../events';
 import { isFireFox, isSafari, isWeb } from '../utils';
-import { encodeFunction, decodeFunction } from './ee2e.ts';
-
-
 
 const BACKGROUND_REACTION_DELAY = 5000;
 
@@ -66,37 +63,13 @@ export abstract class Track extends (EventEmitter as new () => TypedEventEmitter
     }
   }
 
-  encryptTrack(operation: String) {
-	  // @ts-expect-error
-	  const trackProcessor = new MediaStreamTrackProcessor({track: this._mediaStreamTrack});
-	  // @ts-expect-error
-	  const trackGenerator = new MediaStreamTrackGenerator({kind: this.kind});
-	  if (operation === 'encode') {
-		  const transformer = new TransformStream({
-			  transform: encodeFunction,
-		  });
-		  trackProcessor.readable.pipeThrough(transformer).pipeTo(trackGenerator.writable);
-	  } else if (operation === 'decode') {
-		  const transformer = new TransformStream({
-			  transform: decodeFunction,
-		  });
-		  trackProcessor.readable.pipeThrough(transformer).pipeTo(trackGenerator.writable);
-	  }
-
-	  const encryptedStream = new MediaStream([trackGenerator]);
-	  const encryptedTracks = encryptedStream.getTracks()
-	  console.log("there's no encryption, be a lot cooler if there was!");
-	  return encryptedTracks[0]
-  }
-
   /** current receive bits per second */
   get currentBitrate(): number {
     return this._currentBitrate;
   }
 
   get mediaStreamTrack() {
-	
-    return this.encryptTrack("encode")
+    return this._mediaStreamTrack;
   }
 
   /**

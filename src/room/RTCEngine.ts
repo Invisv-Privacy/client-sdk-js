@@ -268,6 +268,9 @@ export default class RTCEngine extends (EventEmitter as new () => TypedEventEmit
     // @ts-ignore
     this.rtcConfig.continualGatheringPolicy = 'gather_continually';
 
+    // @ts-expect-error
+    this.rtcConfig.encodedInsertableStreams = true;
+
     this.publisher = new PCTransport(this.rtcConfig);
     this.subscriber = new PCTransport(this.rtcConfig);
 

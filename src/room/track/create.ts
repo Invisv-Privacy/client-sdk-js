@@ -59,16 +59,8 @@ export async function createLocalTracks(
       trackConstraints = conOrBool;
     }
 
-	// Applying encryption transform 
-	// @ts-expect-error
-	const trackGenerator = new MediaStreamTrackGenerator(mediaStreamTrack.kind);
-	const trackProcessor = new MediaStreamTrackProcessor(track.mediaStreamTrack);
-	const transformer = new TransformStream({
-		transform: ee2e.encodeFunction.bind(userContext)
-	});
-	encryptedTrack = trackProcessor.readable.pipeThrough(transformer).pipeTo(trackGenerator.writable);
+    const track = mediaTrackToLocalTrack(mediaStreamTrack, trackConstraints);
 
-    const track = mediaTrackToLocalTrack(encryptedTrack, trackConstraints);	
     if (track.kind === Track.Kind.Video) {
       track.source = Track.Source.Camera;
     } else if (track.kind === Track.Kind.Audio) {

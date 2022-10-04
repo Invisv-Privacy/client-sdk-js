@@ -51,9 +51,13 @@ async function generateKey(password: string) {
 
 export default class E2EEManager {
   currentCryptoKey?: CryptoKey;
+
   currentPassword?: string;
+
   useCryptoOffset: Boolean;
+
   currentKeyIdentifier: number;
+
   sendCounts: Map<number, number>;
 
   constructor() {

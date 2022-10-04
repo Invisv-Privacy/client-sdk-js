@@ -7,6 +7,7 @@ import json from '@rollup/plugin-json';
 import { terser } from 'rollup-plugin-terser';
 import replace from 'rollup-plugin-re';
 import filesize from 'rollup-plugin-filesize';
+import webWorkerLoader from 'rollup-plugin-web-worker-loader';
 
 import packageJson from './package.json';
 
@@ -39,6 +40,7 @@ export default {
     typescript({ tsconfig: './tsconfig.json' }),
     commonjs(),
     json(),
+    webWorkerLoader({ extensions: ['.js', '.ts'] }),
     babel({
       babelHelpers: 'bundled',
       presets: [['@babel/preset-env', { include: ['@babel/plugin-proposal-object-rest-spread'] }]],

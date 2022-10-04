@@ -100,7 +100,7 @@ export default class PCTransport {
 
     const sdpParsed = parse(offer.sdp ?? '');
     sdpParsed.media.forEach((media) => {
-      const newCandidates = media.candidates?.filter(candidate => candidate.type === 'relay');
+      const newCandidates = media.candidates?.filter((candidate) => candidate.type === 'relay');
       media.candidates = newCandidates;
 
       if (media.type === 'audio') {

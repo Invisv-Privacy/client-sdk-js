@@ -22,9 +22,18 @@ export default class RemoteParticipant extends Participant {
 
   private volume?: number;
 
+  e2eePassword?: string;
+
   /** @internal */
   static fromParticipantInfo(signalClient: SignalClient, pi: ParticipantInfo): RemoteParticipant {
-    return new RemoteParticipant(signalClient, pi.sid, pi.identity, pi.name, pi.metadata);
+    return new RemoteParticipant(
+      signalClient,
+      pi.sid,
+      pi.identity,
+      pi.name,
+      pi.metadata,
+      pi.e2eePassword,
+    );
   }
 
   /** @internal */
@@ -34,12 +43,16 @@ export default class RemoteParticipant extends Participant {
     identity?: string,
     name?: string,
     metadata?: string,
+    e2eePassword?: string,
   ) {
     super(sid, identity || '', name, metadata);
     this.signalClient = signalClient;
     this.tracks = new Map();
     this.audioTracks = new Map();
     this.videoTracks = new Map();
+    this.e2eePassword = e2eePassword;
+
+    console.log('RemoteParticipant constructor', this.e2eePassword);
   }
 
   protected addTrackPublication(publication: RemoteTrackPublication) {
@@ -177,6 +190,11 @@ export default class RemoteParticipant extends Participant {
     track.setMediaStream(mediaStream);
     track.start();
 
+    console.log('RemoteParticipant', this.e2eePassword);
+    if (this.e2eePassword) {
+      track.initializeEncryption(this.e2eePassword);
+    }
+
     publication.setTrack(track);
     // set participant volume on new microphone tracks
     if (
@@ -197,6 +215,20 @@ export default class RemoteParticipant extends Participant {
 
   getTrackPublication(sid: Track.SID): RemoteTrackPublication | undefined {
     return this.tracks.get(sid);
+  }
+
+  updatePassword(password: string) {
+    console.log('updatePassword RemoteParticipant');
+    if (this.e2eePassword !== password) {
+      this.e2eePassword = password;
+      const { e2eePassword } = this;
+      if (typeof e2eePassword !== 'undefined') {
+        this.tracks.forEach((trackPublication) => {
+          trackPublication.track?.setPassword(e2eePassword);
+          trackPublication.track?.decryptTrack();
+        });
+      }
+    }
   }
 
   /** @internal */
@@ -262,6 +294,21 @@ export default class RemoteParticipant extends Participant {
         });
         this.unpublishTrack(publication.trackSid, true);
       }
+    });
+
+    console.log('in updateInfo', info);
+    if (this.e2eePassword !== info.e2eePassword) {
+      this.e2eePassword = info.e2eePassword;
+      const { e2eePassword } = this;
+      if (typeof e2eePassword !== 'undefined') {
+        this.tracks.forEach((trackPublication) => {
+          trackPublication.track?.setPassword(e2eePassword);
+        });
+      }
+    }
+
+    this.tracks.forEach((trackPublication) => {
+      trackPublication.track?.decryptTrack();
     });
   }
 

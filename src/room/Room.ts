@@ -489,6 +489,14 @@ class Room extends (EventEmitter as new () => TypedEmitter<RoomEventCallbacks>) 
     this.disconnect();
   };
 
+  updatePassword = (password: string) => {
+    this.participants.forEach((p) => {
+      p.updatePassword(password);
+    });
+
+    this.localParticipant.updatePassword(password);
+  };
+
   /**
    * Browsers have different policies regarding audio playback. Most requiring
    * some form of user interaction (click/tap/etc).
@@ -782,7 +790,10 @@ class Room extends (EventEmitter as new () => TypedEmitter<RoomEventCallbacks>) 
         this.handleParticipantDisconnected(info.sid, remoteParticipant);
       } else if (!isNewParticipant) {
         // just update, no events
-        remoteParticipant.updateInfo(info);
+        remoteParticipant.updateInfo({
+          e2eePassword: this.options.e2ePassword,
+          ...info,
+        });
       }
     });
   };
@@ -963,9 +974,17 @@ class Room extends (EventEmitter as new () => TypedEmitter<RoomEventCallbacks>) 
   private createParticipant(id: string, info?: ParticipantInfo): RemoteParticipant {
     let participant: RemoteParticipant;
     if (info) {
-      participant = RemoteParticipant.fromParticipantInfo(this.engine.client, info);
+      const infoWithPassword = { ...info, e2eePassword: this.options.e2ePassword };
+      participant = RemoteParticipant.fromParticipantInfo(this.engine.client, infoWithPassword);
     } else {
-      participant = new RemoteParticipant(this.engine.client, id, '');
+      participant = new RemoteParticipant(
+        this.engine.client,
+        id,
+        '',
+        '',
+        '',
+        this.options.e2ePassword,
+      );
     }
     return participant;
   }
@@ -1051,7 +1070,10 @@ class Room extends (EventEmitter as new () => TypedEmitter<RoomEventCallbacks>) 
 
     // update info at the end after callbacks have been set up
     if (info) {
-      participant.updateInfo(info);
+      participant.updateInfo({
+        e2eePassword: this.options.e2ePassword,
+        ...info,
+      });
     }
     return participant;
   }

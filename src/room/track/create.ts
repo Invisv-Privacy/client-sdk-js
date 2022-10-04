@@ -14,6 +14,7 @@ import {
 } from './options';
 import { Track } from './Track';
 import { constraintsForOptions, mergeDefaultOptions } from './utils';
+//import { encodeFunction } from './ee2e'
 
 /**
  * Creates a local video and audio track at the same time. When acquiring both
@@ -57,7 +58,9 @@ export async function createLocalTracks(
     if (typeof conOrBool !== 'boolean') {
       trackConstraints = conOrBool;
     }
+
     const track = mediaTrackToLocalTrack(mediaStreamTrack, trackConstraints);
+
     if (track.kind === Track.Kind.Video) {
       track.source = Track.Source.Camera;
     } else if (track.kind === Track.Kind.Audio) {

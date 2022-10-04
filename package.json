@@ -19,7 +19,7 @@
   "author": "David Zhao <david@davidzhao.com>",
   "license": "Apache-2.0",
   "scripts": {
-    "build": "rollup --config",
+    "build": "rollup --config rollup.config.js",
     "build:watch": "rollup --watch --config rollup.config.js",
     "build-docs": "typedoc",
     "proto": "protoc --plugin=node_modules/ts-proto/protoc-gen-ts_proto --ts_proto_opt=esModuleInterop=true --ts_proto_out=./src/proto --ts_proto_opt=outputClientImpl=false,useOptionals=messages,oneof=unions -I./protocol ./protocol/livekit_rtc.proto ./protocol/livekit_models.proto",
@@ -72,6 +72,7 @@
     "rollup-plugin-serve": "2.0.1",
     "rollup-plugin-terser": "7.0.2",
     "rollup-plugin-typescript2": "0.34.0",
+    "rollup-plugin-web-worker-loader": "^1.6.1",
     "ts-jest": "29.0.3",
     "ts-proto": "1.126.1",
     "typedoc": "0.23.15",

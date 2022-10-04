@@ -98,6 +98,7 @@ export function streamStateToJSON(object: StreamState): string {
 export enum CandidateProtocol {
   UDP = 0,
   TCP = 1,
+  TLS = 2,
   UNRECOGNIZED = -1,
 }
 
@@ -109,6 +110,9 @@ export function candidateProtocolFromJSON(object: any): CandidateProtocol {
     case 1:
     case 'TCP':
       return CandidateProtocol.TCP;
+    case 2:
+    case 'TLS':
+      return CandidateProtocol.TLS;
     case -1:
     case 'UNRECOGNIZED':
     default:
@@ -122,6 +126,8 @@ export function candidateProtocolToJSON(object: CandidateProtocol): string {
       return 'UDP';
     case CandidateProtocol.TCP:
       return 'TCP';
+    case CandidateProtocol.TLS:
+      return 'TLS';
     case CandidateProtocol.UNRECOGNIZED:
     default:
       return 'UNRECOGNIZED';
@@ -348,10 +354,13 @@ export interface SubscriptionPermissionUpdate {
 }
 
 export interface SyncState {
+  /** last subscribe answer before reconnecting */
   answer?: SessionDescription;
   subscription?: UpdateSubscription;
   publishTracks: TrackPublishedResponse[];
   dataChannels: DataChannelInfo[];
+  /** last received server side offer before reconnecting */
+  offer?: SessionDescription;
 }
 
 export interface DataChannelInfo {
@@ -3146,7 +3155,13 @@ export const SubscriptionPermissionUpdate = {
 };
 
 function createBaseSyncState(): SyncState {
-  return { answer: undefined, subscription: undefined, publishTracks: [], dataChannels: [] };
+  return {
+    answer: undefined,
+    subscription: undefined,
+    publishTracks: [],
+    dataChannels: [],
+    offer: undefined,
+  };
 }
 
 export const SyncState = {
@@ -3162,6 +3177,9 @@ export const SyncState = {
     }
     for (const v of message.dataChannels) {
       DataChannelInfo.encode(v!, writer.uint32(34).fork()).ldelim();
+    }
+    if (message.offer !== undefined) {
+      SessionDescription.encode(message.offer, writer.uint32(42).fork()).ldelim();
     }
     return writer;
   },
@@ -3185,6 +3203,9 @@ export const SyncState = {
         case 4:
           message.dataChannels.push(DataChannelInfo.decode(reader, reader.uint32()));
           break;
+        case 5:
+          message.offer = SessionDescription.decode(reader, reader.uint32());
+          break;
         default:
           reader.skipType(tag & 7);
           break;
@@ -3205,6 +3226,7 @@ export const SyncState = {
       dataChannels: Array.isArray(object?.dataChannels)
         ? object.dataChannels.map((e: any) => DataChannelInfo.fromJSON(e))
         : [],
+      offer: isSet(object.offer) ? SessionDescription.fromJSON(object.offer) : undefined,
     };
   },
 
@@ -3230,6 +3252,8 @@ export const SyncState = {
     } else {
       obj.dataChannels = [];
     }
+    message.offer !== undefined &&
+      (obj.offer = message.offer ? SessionDescription.toJSON(message.offer) : undefined);
     return obj;
   },
 
@@ -3246,6 +3270,10 @@ export const SyncState = {
     message.publishTracks =
       object.publishTracks?.map((e) => TrackPublishedResponse.fromPartial(e)) || [];
     message.dataChannels = object.dataChannels?.map((e) => DataChannelInfo.fromPartial(e)) || [];
+    message.offer =
+      object.offer !== undefined && object.offer !== null
+        ? SessionDescription.fromPartial(object.offer)
+        : undefined;
     return message;
   },
 };

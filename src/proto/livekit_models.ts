@@ -257,6 +257,9 @@ export function disconnectReasonFromJSON(object: any): DisconnectReason {
     case 7:
     case 'JOIN_FAILURE':
       return DisconnectReason.JOIN_FAILURE;
+    case 8:
+    case 'CAPACITY_REACHED':
+      return DisconnectReason.CAPACITY_REACHED;
     case -1:
     case 'UNRECOGNIZED':
     default:
@@ -282,6 +285,8 @@ export function disconnectReasonToJSON(object: DisconnectReason): string {
       return 'STATE_MISMATCH';
     case DisconnectReason.JOIN_FAILURE:
       return 'JOIN_FAILURE';
+    case DisconnectReason.CAPACITY_REACHED:
+      return 'CAPACITY_REACHED';
     case DisconnectReason.UNRECOGNIZED:
     default:
       return 'UNRECOGNIZED';
@@ -299,6 +304,7 @@ export interface Room {
   metadata: string;
   numParticipants: number;
   activeRecording: boolean;
+  roomTimeout: number;
 }
 
 export interface Codec {
@@ -624,6 +630,7 @@ export interface ClientConfiguration {
   screen?: VideoConfiguration;
   resumeConnection: ClientConfigSetting;
   disabledCodecs?: DisabledCodecs;
+  forceRelay: ClientConfigSetting;
 }
 
 export interface VideoConfiguration {
@@ -700,6 +707,7 @@ function createBaseRoom(): Room {
     metadata: '',
     numParticipants: 0,
     activeRecording: false,
+    roomTimeout: 0,
   };
 }
 
@@ -734,6 +742,9 @@ export const Room = {
     }
     if (message.activeRecording === true) {
       writer.uint32(80).bool(message.activeRecording);
+    }
+    if (message.roomTimeout !== 0) {
+      writer.uint32(88).uint32(message.roomTimeout);
     }
     return writer;
   },
@@ -775,6 +786,9 @@ export const Room = {
         case 10:
           message.activeRecording = reader.bool();
           break;
+        case 11:
+          message.roomTimeout = reader.uint32();
+          break;
         default:
           reader.skipType(tag & 7);
           break;
@@ -797,6 +811,7 @@ export const Room = {
       metadata: isSet(object.metadata) ? String(object.metadata) : '',
       numParticipants: isSet(object.numParticipants) ? Number(object.numParticipants) : 0,
       activeRecording: isSet(object.activeRecording) ? Boolean(object.activeRecording) : false,
+      roomTimeout: isSet(object.roomTimeout) ? Number(object.roomTimeout) : 0,
     };
   },
 
@@ -818,6 +833,7 @@ export const Room = {
     message.numParticipants !== undefined &&
       (obj.numParticipants = Math.round(message.numParticipants));
     message.activeRecording !== undefined && (obj.activeRecording = message.activeRecording);
+    message.roomTimeout !== undefined && (obj.roomTimeout = Math.round(message.roomTimeout));
     return obj;
   },
 
@@ -833,6 +849,7 @@ export const Room = {
     message.metadata = object.metadata ?? '';
     message.numParticipants = object.numParticipants ?? 0;
     message.activeRecording = object.activeRecording ?? false;
+    message.roomTimeout = object.roomTimeout ?? 0;
     return message;
   },
 };
@@ -2095,7 +2112,13 @@ export const ClientInfo = {
 };
 
 function createBaseClientConfiguration(): ClientConfiguration {
-  return { video: undefined, screen: undefined, resumeConnection: 0, disabledCodecs: undefined };
+  return {
+    video: undefined,
+    screen: undefined,
+    resumeConnection: 0,
+    disabledCodecs: undefined,
+    forceRelay: 0,
+  };
 }
 
 export const ClientConfiguration = {
@@ -2111,6 +2134,9 @@ export const ClientConfiguration = {
     }
     if (message.disabledCodecs !== undefined) {
       DisabledCodecs.encode(message.disabledCodecs, writer.uint32(34).fork()).ldelim();
+    }
+    if (message.forceRelay !== 0) {
+      writer.uint32(40).int32(message.forceRelay);
     }
     return writer;
   },
@@ -2134,6 +2160,9 @@ export const ClientConfiguration = {
         case 4:
           message.disabledCodecs = DisabledCodecs.decode(reader, reader.uint32());
           break;
+        case 5:
+          message.forceRelay = reader.int32() as any;
+          break;
         default:
           reader.skipType(tag & 7);
           break;
@@ -2152,6 +2181,7 @@ export const ClientConfiguration = {
       disabledCodecs: isSet(object.disabledCodecs)
         ? DisabledCodecs.fromJSON(object.disabledCodecs)
         : undefined,
+      forceRelay: isSet(object.forceRelay) ? clientConfigSettingFromJSON(object.forceRelay) : 0,
     };
   },
 
@@ -2167,6 +2197,8 @@ export const ClientConfiguration = {
       (obj.disabledCodecs = message.disabledCodecs
         ? DisabledCodecs.toJSON(message.disabledCodecs)
         : undefined);
+    message.forceRelay !== undefined &&
+      (obj.forceRelay = clientConfigSettingToJSON(message.forceRelay));
     return obj;
   },
 
@@ -2187,6 +2219,7 @@ export const ClientConfiguration = {
       object.disabledCodecs !== undefined && object.disabledCodecs !== null
         ? DisabledCodecs.fromPartial(object.disabledCodecs)
         : undefined;
+    message.forceRelay = object.forceRelay ?? 0;
     return message;
   },
 };

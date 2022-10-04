@@ -2,7 +2,7 @@ import { EventEmitter } from 'events';
 import type TypedEventEmitter from 'typed-emitter';
 import { SignalClient, SignalOptions } from '../api/SignalClient';
 import log from '../logger';
-import type { RoomOptions } from '../options';
+import type { InternalRoomOptions } from '../options';
 import {
   ClientConfigSetting,
   ClientConfiguration,
@@ -20,8 +20,12 @@ import {
   SignalTarget,
   TrackPublishedResponse,
 } from '../proto/livekit_rtc';
-import DefaultReconnectPolicy from './DefaultReconnectPolicy';
-import { ConnectionError, TrackInvalidError, UnexpectedConnectionState } from './errors';
+import {
+  ConnectionError,
+  NegotiationError,
+  TrackInvalidError,
+  UnexpectedConnectionState,
+} from './errors';
 import { EngineEvent } from './events';
 import PCTransport from './PCTransport';
 import type { ReconnectContext, ReconnectPolicy } from './ReconnectPolicy';
@@ -30,7 +34,13 @@ import type LocalVideoTrack from './track/LocalVideoTrack';
 import type { SimulcastTrackInfo } from './track/LocalVideoTrack';
 import type { TrackPublishOptions, VideoCodec } from './track/options';
 import { Track } from './track/Track';
-import { isWeb, sleep, supportsAddTrack, supportsTransceiver } from './utils';
+import {
+  isWeb,
+  sleep,
+  supportsAddTrack,
+  supportsSetCodecPreferences,
+  supportsTransceiver,
+} from './utils';
 
 const lossyDataChannel = '_lossy';
 const reliableDataChannel = '_reliable';
@@ -109,17 +119,19 @@ export default class RTCEngine extends (EventEmitter as new () => TypedEventEmit
 
   private reconnectTimeout?: ReturnType<typeof setTimeout>;
 
-  constructor(private options: RoomOptions) {
+  private participantSid?: string;
+
+  constructor(private options: InternalRoomOptions) {
     super();
     this.client = new SignalClient();
     this.client.signalLatency = this.options.expSignalLatency;
-    this.reconnectPolicy = this.options.reconnectPolicy ?? new DefaultReconnectPolicy();
+    this.reconnectPolicy = this.options.reconnectPolicy;
   }
 
   async join(
     url: string,
     token: string,
-    opts?: SignalOptions,
+    opts: SignalOptions,
     abortSignal?: AbortSignal,
   ): Promise<JoinResponse> {
     this.url = url;
@@ -226,6 +238,8 @@ export default class RTCEngine extends (EventEmitter as new () => TypedEventEmit
       return;
     }
 
+    this.participantSid = joinResponse.participant?.sid;
+
     // update ICE servers before creating PeerConnection
     if (joinResponse.iceServers && !this.rtcConfig.iceServers) {
       const rtcIceServers: RTCIceServer[] = [];
@@ -242,6 +256,13 @@ export default class RTCEngine extends (EventEmitter as new () => TypedEventEmit
       this.rtcConfig.iceServers = rtcIceServers;
     }
 
+    if (
+      joinResponse.clientConfiguration &&
+      joinResponse.clientConfiguration.forceRelay === ClientConfigSetting.ENABLED
+    ) {
+      this.rtcConfig.iceTransportPolicy = 'relay';
+    }
+
     // @ts-ignore
     this.rtcConfig.sdpSemantics = 'unified-plan';
     // @ts-ignore
@@ -254,12 +275,21 @@ export default class RTCEngine extends (EventEmitter as new () => TypedEventEmit
 
     this.publisher.pc.onicecandidate = (ev) => {
       if (!ev.candidate) return;
-      log.trace('adding ICE candidate for peer', ev.candidate);
+      if (ev.candidate.type !== 'relay') {
+        log.info('not sending non-relay type ICE candidate for peer publisher', ev.candidate);
+        return;
+      }
+      log.trace('adding ICE candidate for peer publisher', ev.candidate);
       this.client.sendIceCandidate(ev.candidate, SignalTarget.PUBLISHER);
     };
 
     this.subscriber.pc.onicecandidate = (ev) => {
       if (!ev.candidate) return;
+      if (ev.candidate.type !== 'relay') {
+        log.info('not sending non-relay type ICE candidate for peer subscriber', ev.candidate);
+        return;
+      }
+      log.trace('adding ICE candidate for peer subscriber', ev.candidate);
       this.client.sendIceCandidate(ev.candidate, SignalTarget.SUBSCRIBER);
     };
 
@@ -519,7 +549,7 @@ export default class RTCEngine extends (EventEmitter as new () => TypedEventEmit
       matched.push(c);
     });
 
-    if ('setCodecPreferences' in transceiver) {
+    if (supportsSetCodecPreferences(transceiver)) {
       transceiver.setCodecPreferences(matched.concat(partialMatched, unmatched));
     }
   }
@@ -752,6 +782,10 @@ export default class RTCEngine extends (EventEmitter as new () => TypedEventEmit
 
     let joinResponse: JoinResponse;
     try {
+      if (!this.signalOpts) {
+        log.warn('attempted connection restart, without signal options present');
+        throw new SignalReconnectError();
+      }
       joinResponse = await this.join(this.url, this.token, this.signalOpts);
     } catch (e) {
       throw new SignalReconnectError();
@@ -780,7 +814,7 @@ export default class RTCEngine extends (EventEmitter as new () => TypedEventEmit
     }
 
     try {
-      await this.client.reconnect(this.url, this.token);
+      await this.client.reconnect(this.url, this.token, this.participantSid);
     } catch (e) {
       let message = '';
       if (e instanceof Error) {
@@ -900,7 +934,12 @@ export default class RTCEngine extends (EventEmitter as new () => TypedEventEmit
 
     this.hasPublished = true;
 
-    this.publisher.negotiate();
+    this.publisher.negotiate((e) => {
+      if (e instanceof NegotiationError) {
+        this.fullReconnectOnNext = true;
+      }
+      this.handleDisconnect('negotiation');
+    });
   }
 
   dataChannelForKind(kind: DataPacket_Kind, sub?: boolean): RTCDataChannel | undefined {

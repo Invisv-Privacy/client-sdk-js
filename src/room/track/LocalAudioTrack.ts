@@ -13,6 +13,12 @@ export default class LocalAudioTrack extends LocalTrack {
 
   private prevStats?: AudioSenderStats;
 
+  /**
+   *
+   * @param mediaTrack
+   * @param constraints MediaTrackConstraints that are being used when restarting or reacquiring tracks
+   * @param userProvidedTrack Signals to the SDK whether or not the mediaTrack should be managed (i.e. released and reacquired) internally by the SDK
+   */
   constructor(
     mediaTrack: MediaStreamTrack,
     constraints?: MediaTrackConstraints,
@@ -78,12 +84,15 @@ export default class LocalAudioTrack extends LocalTrack {
     if (!isWeb()) {
       return;
     }
-    setTimeout(() => {
+    if (this.monitorInterval) {
+      return;
+    }
+    this.monitorInterval = setInterval(() => {
       this.monitorSender();
     }, monitorFrequency);
   }
 
-  private monitorSender = async () => {
+  protected monitorSender = async () => {
     if (!this.sender) {
       this._currentBitrate = 0;
       return;
@@ -102,9 +111,6 @@ export default class LocalAudioTrack extends LocalTrack {
     }
 
     this.prevStats = stats;
-    setTimeout(() => {
-      this.monitorSender();
-    }, monitorFrequency);
   };
 
   async getSenderStats(): Promise<AudioSenderStats | undefined> {

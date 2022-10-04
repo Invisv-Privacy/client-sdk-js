@@ -7,7 +7,7 @@ import { getEmptyAudioStreamTrack, getEmptyVideoStreamTrack, isMobile } from '..
 import type { VideoCodec } from './options';
 import { attachToElement, detachTrack, Track } from './Track';
 
-export default class LocalTrack extends Track {
+export default abstract class LocalTrack extends Track {
   /** @internal */
   sender?: RTCRtpSender;
 
@@ -22,6 +22,13 @@ export default class LocalTrack extends Track {
 
   protected muteQueue: Queue;
 
+  /**
+   *
+   * @param mediaTrack
+   * @param kind
+   * @param constraints MediaTrackConstraints that are being used when restarting or reacquiring tracks
+   * @param userProvidedTrack Signals to the SDK whether or not the mediaTrack should be managed (i.e. released and reacquired) internally by the SDK
+   */
   protected constructor(
     mediaTrack: MediaStreamTrack,
     kind: Track.Kind,
@@ -249,4 +256,6 @@ export default class LocalTrack extends Track {
       await this.sender.replaceTrack(this._mediaStreamTrack);
     });
   }
+
+  protected abstract monitorSender(): void;
 }

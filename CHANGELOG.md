@@ -1,5 +1,79 @@
 # Change Log
 
+## 1.4.1
+
+### Patch Changes
+
+- [#448](https://github.com/livekit/client-sdk-js/pull/448) [`14f71de`](https://github.com/livekit/client-sdk-js/commit/14f71de26fa06a1fe23a767d0584921a7a7de1a1) Thanks [@lukasIO](https://github.com/lukasIO)! - fix localTrackUnpublish true by default
+
+## 1.4.0
+
+### Minor Changes
+
+- [#443](https://github.com/livekit/client-sdk-js/pull/443) [`438d067`](https://github.com/livekit/client-sdk-js/commit/438d0679bf215b5c5edd20b900d1dca0362d651c) Thanks [@lukasIO](https://github.com/lukasIO)! - **Breaking** Decouple SubscriptionStatus and SubscriptionPermissionStatus
+
+### Patch Changes
+
+- [#440](https://github.com/livekit/client-sdk-js/pull/440) [`b74eae6`](https://github.com/livekit/client-sdk-js/commit/b74eae69adedeed814e1fad09073ac2c431de49c) Thanks [@davidzhao](https://github.com/davidzhao)! - Improve handling of connection resume failures
+
+- [#445](https://github.com/livekit/client-sdk-js/pull/445) [`dabebad`](https://github.com/livekit/client-sdk-js/commit/dabebad0574a874915366223783182338f84f02b) Thanks [@lukasIO](https://github.com/lukasIO)! - Increase event listener limit
+
+## 1.3.3
+
+### Patch Changes
+
+- [#423](https://github.com/livekit/client-sdk-js/pull/423) [`e4ead3d`](https://github.com/livekit/client-sdk-js/commit/e4ead3d0f62d935214b97f76c274da66991c34ea) Thanks [@lukasIO](https://github.com/lukasIO)! - Add subscriptionStatusChanged event and isDesired getter for RemoteTrack Publications
+
+- [#432](https://github.com/livekit/client-sdk-js/pull/432) [`3c80714`](https://github.com/livekit/client-sdk-js/commit/3c807143e69f94950f4969eb309d81200280c41a) Thanks [@cnderrauber](https://github.com/cnderrauber)! - send previous server offer when reconnecting
+
+- [#431](https://github.com/livekit/client-sdk-js/pull/431) [`4004426`](https://github.com/livekit/client-sdk-js/commit/40044262a3c30d039dbc8f66dac8dffb3ecdd8f3) Thanks [@lukasIO](https://github.com/lukasIO)! - Add RoomEvent.Connected, fix connectFuture rejection exception
+
+- [#436](https://github.com/livekit/client-sdk-js/pull/436) [`1715877`](https://github.com/livekit/client-sdk-js/commit/17158772667a221f2fc31d459473f9a049402fbe) Thanks [@lukasIO](https://github.com/lukasIO)! - Use explicit defaults for room and connect options
+
+## 1.3.2
+
+### Patch Changes
+
+- [#425](https://github.com/livekit/client-sdk-js/pull/425) [`6a77802`](https://github.com/livekit/client-sdk-js/commit/6a77802eb4d585b99a1152dbde9e6f70da064862) Thanks [@cnderrauber](https://github.com/cnderrauber)! - add participant id when reconnecting
+
+- [#427](https://github.com/livekit/client-sdk-js/pull/427) [`c477b77`](https://github.com/livekit/client-sdk-js/commit/c477b77e5dac3e2cf8c734193f9f94e529b45311) Thanks [@cnderrauber](https://github.com/cnderrauber)! - fix video attach to incorrect element when tranceiver reuse
+
+## 1.3.1
+
+### Patch Changes
+
+- [#414](https://github.com/livekit/client-sdk-js/pull/414) [`6b748da`](https://github.com/livekit/client-sdk-js/commit/6b748daaff89f3f6c903283af88440d35b0273d5) Thanks [@cnderrauber](https://github.com/cnderrauber)! - add force relay configuration
+
+* [#418](https://github.com/livekit/client-sdk-js/pull/418) [`82107cf`](https://github.com/livekit/client-sdk-js/commit/82107cf5861a5fe903cb3f91ab32900c9d116cf4) Thanks [@davidzhao](https://github.com/davidzhao)! - Fixed compatibility with older browsers with setCodecPreferences (Chrome 96)
+
+- [#419](https://github.com/livekit/client-sdk-js/pull/419) [`84a96b2`](https://github.com/livekit/client-sdk-js/commit/84a96b2bd8d354c68f94f8a3309bf13803aad8ab) Thanks [@cnderrauber](https://github.com/cnderrauber)! - fix video track lost for safari migration
+
+* [#420](https://github.com/livekit/client-sdk-js/pull/420) [`0c45c73`](https://github.com/livekit/client-sdk-js/commit/0c45c73095a46b876810d90306c3d350f4a5f857) Thanks [@lukasIO](https://github.com/lukasIO)! - Add permission track event to typed callbacks
+
+## 1.3.0
+
+### Minor Changes
+
+- [#407](https://github.com/livekit/client-sdk-js/pull/407) [`91f6648`](https://github.com/livekit/client-sdk-js/commit/91f6648da8c3b888b3f063a46f62aeaa47ec0b3d) Thanks [@lukasIO](https://github.com/lukasIO)! - add types for publication events
+
+### Patch Changes
+
+- [#400](https://github.com/livekit/client-sdk-js/pull/400) [`d6dd20c`](https://github.com/livekit/client-sdk-js/commit/d6dd20c00633d9e3303c813ba303812c75783ba9) Thanks [@lukasIO](https://github.com/lukasIO)! - Fallback to unmunged sdp for answer
+
+* [#334](https://github.com/livekit/client-sdk-js/pull/334) [`8cb17ec`](https://github.com/livekit/client-sdk-js/commit/8cb17ecc6170b4d723813c90ee5a04cb0bd5fe2b) Thanks [@lukasIO](https://github.com/lukasIO)! - Add experimental support for fallback codec
+
+- [#396](https://github.com/livekit/client-sdk-js/pull/396) [`027ede3`](https://github.com/livekit/client-sdk-js/commit/027ede3c6f776a1c5e690e38a58a7edca1583fbd) Thanks [@davidzhao](https://github.com/davidzhao)! - Send current network type to server
+
+* [#410](https://github.com/livekit/client-sdk-js/pull/410) [`5b31a19`](https://github.com/livekit/client-sdk-js/commit/5b31a19543b80f90349a086016ac9fc37a91bcb1) Thanks [@lukasIO](https://github.com/lukasIO)! - Move monitor APIs in parent classes
+
+- [#393](https://github.com/livekit/client-sdk-js/pull/393) [`bfad4b3`](https://github.com/livekit/client-sdk-js/commit/bfad4b319398c9c06d439bb9dcc03d185ac37b74) Thanks [@wcarle](https://github.com/wcarle)! - Prevent multiple redundant monitors from being started if start is called multiple times on a RemoteTrack
+
+* [#397](https://github.com/livekit/client-sdk-js/pull/397) [`0f6b399`](https://github.com/livekit/client-sdk-js/commit/0f6b39999b90ceabd83daca7617171a145ad6dca) Thanks [@cnderrauber](https://github.com/cnderrauber)! - enable simucalst codecs for firefox
+
+- [#403](https://github.com/livekit/client-sdk-js/pull/403) [`fb2b221`](https://github.com/livekit/client-sdk-js/commit/fb2b221555eccc9ec0f1bc663d3b383dd513f384) Thanks [@lukasIO](https://github.com/lukasIO)! - Add fallback for addTrack if addTransceiver is not supported
+
+* [#405](https://github.com/livekit/client-sdk-js/pull/405) [`2983939`](https://github.com/livekit/client-sdk-js/commit/2983939a48068def9ee0cf86c18af7f9ef0ec045) Thanks [@lukasIO](https://github.com/lukasIO)! - Update browserslist
+
 ## 1.2.11
 
 ### Patch Changes

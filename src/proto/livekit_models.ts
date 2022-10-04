@@ -227,6 +227,7 @@ export enum DisconnectReason {
   ROOM_DELETED = 5,
   STATE_MISMATCH = 6,
   JOIN_FAILURE = 7,
+  CAPACITY_REACHED = 8,
   UNRECOGNIZED = -1,
 }
 
@@ -256,6 +257,9 @@ export function disconnectReasonFromJSON(object: any): DisconnectReason {
     case 7:
     case "JOIN_FAILURE":
       return DisconnectReason.JOIN_FAILURE;
+    case 8:
+    case "CAPACITY_REACHED":
+      return DisconnectReason.CAPACITY_REACHED;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -281,7 +285,60 @@ export function disconnectReasonToJSON(object: DisconnectReason): string {
       return "STATE_MISMATCH";
     case DisconnectReason.JOIN_FAILURE:
       return "JOIN_FAILURE";
+    case DisconnectReason.CAPACITY_REACHED:
+      return "CAPACITY_REACHED";
     case DisconnectReason.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
+export enum ReconnectReason {
+  RR_UNKOWN = 0,
+  RR_SIGNAL_DISCONNECTED = 1,
+  RR_PUBLISHER_FAILED = 2,
+  RR_SUBSCRIBER_FAILED = 3,
+  RR_SWITCH_CANDIDATE = 4,
+  UNRECOGNIZED = -1,
+}
+
+export function reconnectReasonFromJSON(object: any): ReconnectReason {
+  switch (object) {
+    case 0:
+    case "RR_UNKOWN":
+      return ReconnectReason.RR_UNKOWN;
+    case 1:
+    case "RR_SIGNAL_DISCONNECTED":
+      return ReconnectReason.RR_SIGNAL_DISCONNECTED;
+    case 2:
+    case "RR_PUBLISHER_FAILED":
+      return ReconnectReason.RR_PUBLISHER_FAILED;
+    case 3:
+    case "RR_SUBSCRIBER_FAILED":
+      return ReconnectReason.RR_SUBSCRIBER_FAILED;
+    case 4:
+    case "RR_SWITCH_CANDIDATE":
+      return ReconnectReason.RR_SWITCH_CANDIDATE;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return ReconnectReason.UNRECOGNIZED;
+  }
+}
+
+export function reconnectReasonToJSON(object: ReconnectReason): string {
+  switch (object) {
+    case ReconnectReason.RR_UNKOWN:
+      return "RR_UNKOWN";
+    case ReconnectReason.RR_SIGNAL_DISCONNECTED:
+      return "RR_SIGNAL_DISCONNECTED";
+    case ReconnectReason.RR_PUBLISHER_FAILED:
+      return "RR_PUBLISHER_FAILED";
+    case ReconnectReason.RR_SUBSCRIBER_FAILED:
+      return "RR_SUBSCRIBER_FAILED";
+    case ReconnectReason.RR_SWITCH_CANDIDATE:
+      return "RR_SWITCH_CANDIDATE";
+    case ReconnectReason.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
   }
@@ -298,6 +355,7 @@ export interface Room {
   metadata: string;
   numParticipants: number;
   activeRecording: boolean;
+  roomTimeout: number;
 }
 
 export interface Codec {
@@ -312,6 +370,8 @@ export interface ParticipantPermission {
   canPublish: boolean;
   /** allow participant to publish data */
   canPublishData: boolean;
+  /** sources that are allowed to be published */
+  canPublishSources: TrackSource[];
   /** indicates that it's hidden to others */
   hidden: boolean;
   /** indicates it's a recorder instance */
@@ -746,6 +806,7 @@ function createBaseRoom(): Room {
     metadata: "",
     numParticipants: 0,
     activeRecording: false,
+    roomTimeout: 0,
   };
 }
 
@@ -780,6 +841,9 @@ export const Room = {
     }
     if (message.activeRecording === true) {
       writer.uint32(80).bool(message.activeRecording);
+    }
+    if (message.roomTimeout !== 0) {
+      writer.uint32(88).uint32(message.roomTimeout);
     }
     return writer;
   },
@@ -821,6 +885,9 @@ export const Room = {
         case 10:
           message.activeRecording = reader.bool();
           break;
+        case 11:
+          message.roomTimeout = reader.uint32();
+          break;
         default:
           reader.skipType(tag & 7);
           break;
@@ -843,6 +910,7 @@ export const Room = {
       metadata: isSet(object.metadata) ? String(object.metadata) : "",
       numParticipants: isSet(object.numParticipants) ? Number(object.numParticipants) : 0,
       activeRecording: isSet(object.activeRecording) ? Boolean(object.activeRecording) : false,
+      roomTimeout: isSet(object.roomTimeout) ? Number(object.roomTimeout) : 0,
     };
   },
 
@@ -862,6 +930,7 @@ export const Room = {
     message.metadata !== undefined && (obj.metadata = message.metadata);
     message.numParticipants !== undefined && (obj.numParticipants = Math.round(message.numParticipants));
     message.activeRecording !== undefined && (obj.activeRecording = message.activeRecording);
+    message.roomTimeout !== undefined && (obj.roomTimeout = Math.round(message.roomTimeout));
     return obj;
   },
 
@@ -877,6 +946,7 @@ export const Room = {
     message.metadata = object.metadata ?? "";
     message.numParticipants = object.numParticipants ?? 0;
     message.activeRecording = object.activeRecording ?? false;
+    message.roomTimeout = object.roomTimeout ?? 0;
     return message;
   },
 };
@@ -940,7 +1010,14 @@ export const Codec = {
 };
 
 function createBaseParticipantPermission(): ParticipantPermission {
-  return { canSubscribe: false, canPublish: false, canPublishData: false, hidden: false, recorder: false };
+  return {
+    canSubscribe: false,
+    canPublish: false,
+    canPublishData: false,
+    canPublishSources: [],
+    hidden: false,
+    recorder: false,
+  };
 }
 
 export const ParticipantPermission = {
@@ -954,6 +1031,11 @@ export const ParticipantPermission = {
     if (message.canPublishData === true) {
       writer.uint32(24).bool(message.canPublishData);
     }
+    writer.uint32(74).fork();
+    for (const v of message.canPublishSources) {
+      writer.int32(v);
+    }
+    writer.ldelim();
     if (message.hidden === true) {
       writer.uint32(56).bool(message.hidden);
     }
@@ -979,6 +1061,16 @@ export const ParticipantPermission = {
         case 3:
           message.canPublishData = reader.bool();
           break;
+        case 9:
+          if ((tag & 7) === 2) {
+            const end2 = reader.uint32() + reader.pos;
+            while (reader.pos < end2) {
+              message.canPublishSources.push(reader.int32() as any);
+            }
+          } else {
+            message.canPublishSources.push(reader.int32() as any);
+          }
+          break;
         case 7:
           message.hidden = reader.bool();
           break;
@@ -998,6 +1090,9 @@ export const ParticipantPermission = {
       canSubscribe: isSet(object.canSubscribe) ? Boolean(object.canSubscribe) : false,
       canPublish: isSet(object.canPublish) ? Boolean(object.canPublish) : false,
       canPublishData: isSet(object.canPublishData) ? Boolean(object.canPublishData) : false,
+      canPublishSources: Array.isArray(object?.canPublishSources)
+        ? object.canPublishSources.map((e: any) => trackSourceFromJSON(e))
+        : [],
       hidden: isSet(object.hidden) ? Boolean(object.hidden) : false,
       recorder: isSet(object.recorder) ? Boolean(object.recorder) : false,
     };
@@ -1008,6 +1103,11 @@ export const ParticipantPermission = {
     message.canSubscribe !== undefined && (obj.canSubscribe = message.canSubscribe);
     message.canPublish !== undefined && (obj.canPublish = message.canPublish);
     message.canPublishData !== undefined && (obj.canPublishData = message.canPublishData);
+    if (message.canPublishSources) {
+      obj.canPublishSources = message.canPublishSources.map((e) => trackSourceToJSON(e));
+    } else {
+      obj.canPublishSources = [];
+    }
     message.hidden !== undefined && (obj.hidden = message.hidden);
     message.recorder !== undefined && (obj.recorder = message.recorder);
     return obj;
@@ -1018,6 +1118,7 @@ export const ParticipantPermission = {
     message.canSubscribe = object.canSubscribe ?? false;
     message.canPublish = object.canPublish ?? false;
     message.canPublishData = object.canPublishData ?? false;
+    message.canPublishSources = object.canPublishSources?.map((e) => e) || [];
     message.hidden = object.hidden ?? false;
     message.recorder = object.recorder ?? false;
     return message;
@@ -2940,7 +3041,7 @@ export const TimedVersion = {
 declare var self: any | undefined;
 declare var window: any | undefined;
 declare var global: any | undefined;
-var globalThis: any = (() => {
+var tsProtoGlobalThis: any = (() => {
   if (typeof globalThis !== "undefined") {
     return globalThis;
   }
@@ -2957,10 +3058,10 @@ var globalThis: any = (() => {
 })();
 
 function bytesFromBase64(b64: string): Uint8Array {
-  if (globalThis.Buffer) {
-    return Uint8Array.from(globalThis.Buffer.from(b64, "base64"));
+  if (tsProtoGlobalThis.Buffer) {
+    return Uint8Array.from(tsProtoGlobalThis.Buffer.from(b64, "base64"));
   } else {
-    const bin = globalThis.atob(b64);
+    const bin = tsProtoGlobalThis.atob(b64);
     const arr = new Uint8Array(bin.length);
     for (let i = 0; i < bin.length; ++i) {
       arr[i] = bin.charCodeAt(i);
@@ -2970,14 +3071,14 @@ function bytesFromBase64(b64: string): Uint8Array {
 }
 
 function base64FromBytes(arr: Uint8Array): string {
-  if (globalThis.Buffer) {
-    return globalThis.Buffer.from(arr).toString("base64");
+  if (tsProtoGlobalThis.Buffer) {
+    return tsProtoGlobalThis.Buffer.from(arr).toString("base64");
   } else {
     const bin: string[] = [];
     arr.forEach((byte) => {
       bin.push(String.fromCharCode(byte));
     });
-    return globalThis.btoa(bin.join(""));
+    return tsProtoGlobalThis.btoa(bin.join(""));
   }
 }
 
@@ -3017,7 +3118,7 @@ function fromJsonTimestamp(o: any): Date {
 
 function longToNumber(long: Long): number {
   if (long.gt(Number.MAX_SAFE_INTEGER)) {
-    throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
+    throw new tsProtoGlobalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
   }
   return long.toNumber();
 }

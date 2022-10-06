@@ -980,6 +980,9 @@ class Room extends (EventEmitter as new () => TypedEmitter<RoomEventCallbacks>) 
     const ctx = getNewAudioContext();
     if (ctx) {
       this.audioContext = ctx;
+      if (this.options.expWebAudioMix) {
+        this.participants.forEach((participant) => participant.setAudioContext(this.audioContext));
+      }
     }
   }
 
@@ -993,10 +996,13 @@ class Room extends (EventEmitter as new () => TypedEmitter<RoomEventCallbacks>) 
         this.engine.client,
         id,
         '',
-        '',
-        '',
+        undefined,
+        undefined,
         this.options.e2ePassword,
       );
+    }
+    if (this.options.expWebAudioMix) {
+      participant.setAudioContext(this.audioContext);
     }
     return participant;
   }

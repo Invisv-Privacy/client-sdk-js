@@ -1,3 +1,26 @@
+import log from '../logger';
+
+// Large parts of this e2ee code is borrowed from jitsi's implementation:
+// https://github.com/jitsi/lib-jitsi-meet/blob/84277e1ff3fa925b60d70fe76aea57e8bf182843/modules/e2ee/Context.js#L11-L20
+//
+// Documentation/comments are kept inline here for easier reference
+
+const ENCRYPTION_ALGORITHM = 'AES-GCM';
+
+/* We use a 96 bit IV for AES GCM. This is signalled in plain together with the
+ packet. See https://developer.mozilla.org/en-US/docs/Web/API/AesGcmParams */
+const IV_LENGTH = 12;
+
+// Our encoded frame with frame trailer:
+//
+// ---------+-------------------------+-+---------+----
+// payload  |IV...(length = IV_LENGTH)|R|IV_LENGTH|KID |
+// ---------+-------------------------+-+---------+----
+//
+// The trailer is similar to the frame header described in
+// https://tools.ietf.org/html/draft-omara-sframe-00#section-4.2
+// but we put it at the end.
+
 // We copy the first bytes of the VP8 payload unencrypted.
 // For keyframes this is 10 bytes, for non-keyframes (delta) 3. See
 //   https://tools.ietf.org/html/rfc6386#section-9.1
@@ -13,28 +36,34 @@ const UNENCRYPTED_BYTES = {
   delta: 3,
   undefined: 1, // frame.type is not set on audio
 };
-const ENCRYPTION_ALGORITHM = 'AES-GCM';
 
-/* We use a 96 bit IV for AES GCM. This is signalled in plain together with the
- packet. See https://developer.mozilla.org/en-US/docs/Web/API/AesGcmParams */
-const IV_LENGTH = 12;
+type Chunk = {
+  synchronizationSource: number;
+  data: ArrayBuffer;
+  type: keyof typeof UNENCRYPTED_BYTES;
+  timestamp: number;
+  getMetadata: () => {
+    synchronizationSource: number;
+    payloadType: string;
+  };
+};
 
-export function dump(encodedFrame: any, direction: any, max = 16) {
+export function dump(encodedFrame: Chunk, direction: string, max = 16) {
   const data = new Uint8Array(encodedFrame.data);
   let bytes = '';
   for (let j = 0; j < data.length && j < max; j++) {
     bytes += (data[j] < 16 ? '0' : '') + data[j].toString(16) + ' ';
   }
-  console.log(
-    performance.now().toFixed(2),
+  log.trace('e2ee frame dump', {
+    performance: performance.now().toFixed(2),
     direction,
-    bytes.trim(),
-    'len=' + encodedFrame.data.byteLength,
-    'type=' + (encodedFrame.type || 'audio'),
-    'ts=' + encodedFrame.timestamp,
-    'ssrc=' + encodedFrame.getMetadata().synchronizationSource,
-    'pt=' + (encodedFrame.getMetadata().payloadType || '(unknown)'),
-  );
+    bytes: bytes.trim(),
+    len: encodedFrame.data.byteLength,
+    frameType: encodedFrame.type || 'audio',
+    timestamp: encodedFrame.timestamp,
+    synchronizationSource: encodedFrame.getMetadata().synchronizationSource,
+    payloadType: encodedFrame.getMetadata().payloadType || '(unknown)',
+  });
 }
 
 async function generateKey(password: string) {
@@ -64,14 +93,10 @@ export default class E2EEManager {
     this.useCryptoOffset = true;
     this.currentKeyIdentifier = 0;
     this.sendCounts = new Map();
-    console.log('in the e2ee constructor');
-    // this.rcount = 0;
-    // this.scount = 0;
   }
 
   async setKey(password: string) {
     if (password !== '') {
-      console.log('setKey', password);
       const key = await generateKey(password);
       this.currentCryptoKey = key;
       this.currentPassword = password;
@@ -80,12 +105,27 @@ export default class E2EEManager {
     }
   }
 
-  // @ts-expect-error
-  encodeFunction(encodedFrame, controller) {
+  /**
+   * The VP8 payload descriptor described in
+   * https://tools.ietf.org/html/rfc7741#section-4.2
+   * is part of the RTP packet and not part of the frame and is not controllable by us.
+   * This is fine as the SFU keeps having access to it for routing.
+   *
+   * The encrypted frame is formed as follows:
+   * 1) Leave the first (10, 3, 1) bytes unencrypted, depending on the frame type and kind.
+   * 2) Form the GCM IV for the frame as described above.
+   * 3) Encrypt the rest of the frame using AES-GCM.
+   * 4) Allocate space for the encrypted frame.
+   * 5) Copy the unencrypted bytes to the start of the encrypted frame.
+   * 6) Append the ciphertext to the encrypted frame.
+   * 7) Append the IV.
+   * 8) Append a single byte for the key identifier.
+   * 9) Enqueue the encrypted frame for sending.
+   */
+  encodeFunction(encodedFrame: Chunk, controller: TransformStreamDefaultController) {
     // if (scount++ < 30) {
     //   dump(encodedFrame, 'send');
     // }
-    // console.log('encodeFunction', this.currentPassword);
     if (this.currentCryptoKey && encodedFrame.data.byteLength > 0) {
       try {
         const iv = this.makeIV(
@@ -97,7 +137,6 @@ export default class E2EEManager {
         const frameHeader = new Uint8Array(
           encodedFrame.data,
           0,
-          // @ts-expect-error
           UNENCRYPTED_BYTES[encodedFrame.type],
         );
 
@@ -107,14 +146,6 @@ export default class E2EEManager {
         frameTrailer[0] = IV_LENGTH;
         frameTrailer[1] = this.currentKeyIdentifier;
 
-        // Construct frame trailer. Similar to the frame header described in
-        // https://tools.ietf.org/html/draft-omara-sframe-00#section-4.2
-        // but we put it at the end.
-        //
-        // ---------+-------------------------+-+---------+----
-        // payload  |IV...(length = IV_LENGTH)|R|IV_LENGTH|KID |
-        // ---------+-------------------------+-+---------+----
-
         return crypto.subtle
           .encrypt(
             {
@@ -123,7 +154,6 @@ export default class E2EEManager {
               additionalData: new Uint8Array(encodedFrame.data, 0, frameHeader.byteLength),
             },
             this.currentCryptoKey,
-            // @ts-expect-error
             new Uint8Array(encodedFrame.data, UNENCRYPTED_BYTES[encodedFrame.type]),
           )
           .then(
@@ -148,35 +178,30 @@ export default class E2EEManager {
 
               return controller.enqueue(encodedFrame);
             },
-            (e) => {
+            (error) => {
               // TODO: surface this to the app.
-              console.error(e);
+              log.error('error encrypting', { error });
 
               // We are not enqueuing the frame here on purpose.
             },
           );
-      } catch (e) {
-        // TODO: surface??
-        console.error(e);
+      } catch (error) {
+        // TODO: surface this to the app?
+        log.error('error encoding/encrypting', { error });
       }
     }
     controller.enqueue(encodedFrame);
   }
 
-  async decodeFunction(encodedFrame: any, controller: any) {
+  async decodeFunction(encodedFrame: Chunk, controller: TransformStreamDefaultController) {
     // if (rcount++ < 30) {
     //   dump(encodedFrame, 'recv');
     // }
-    // const view = new DataView(encodedFrame.data);
-    // const checksum =
-    // encodedFrame.data.byteLength > 4 ? view.getUint32(encodedFrame.data.byteLength - 4) : false;
-    // console.log('decodeFunction', this.currentPassword);
     if (this.currentCryptoKey && encodedFrame.data.byteLength > 0) {
       try {
         const frameHeader = new Uint8Array(
           encodedFrame.data,
           0,
-          // @ts-expect-error
           UNENCRYPTED_BYTES[encodedFrame.type],
         );
         const frameTrailer = new Uint8Array(encodedFrame.data, encodedFrame.data.byteLength - 2, 2);
@@ -211,7 +236,7 @@ export default class E2EEManager {
 
         encodedFrame.data = newData;
       } catch (error) {
-        console.error(error);
+        log.error('error decoding/decrypting', { error });
       }
     }
     controller.enqueue(encodedFrame);

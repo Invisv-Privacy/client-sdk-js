@@ -1,6 +1,7 @@
 import { TrackEvent } from '../events';
 import { monitorFrequency } from '../stats';
 import { Track } from './Track';
+import log from '../../logger';
 // @ts-ignore
 import Worker from 'web-worker:../../worker/worker';
 
@@ -34,8 +35,8 @@ export default abstract class RemoteTrack extends Track {
       // @ts-expect-error
       const { readable, writable } = this.receiver.createEncodedStreams();
       this.worker.postMessage({ operation: 'decode', readable, writable }, [readable, writable]);
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      log.error('error creating encoded streams or posting message to worker', { error });
     }
   }
 

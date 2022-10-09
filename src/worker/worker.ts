@@ -1,11 +1,11 @@
 import E2EEManager from './e2ee';
+import log from '../logger';
 
 const manager = new E2EEManager();
 
 onmessage = async (event) => {
   const { operation, readable, writable } = event.data;
-  console.log('message received');
-  console.log(event);
+  log.trace('message received', { event });
 
   if (operation === 'encode') {
     const transformer = new TransformStream({

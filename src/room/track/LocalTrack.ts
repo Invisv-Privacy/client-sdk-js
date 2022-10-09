@@ -65,8 +65,8 @@ export default abstract class LocalTrack extends Track {
       // @ts-expect-error
       const { readable, writable } = this.sender.createEncodedStreams();
       this.worker.postMessage({ operation: 'encode', readable, writable }, [readable, writable]);
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      log.error('error creating encoded streams or posting message to worker', { error });
     }
   }
 

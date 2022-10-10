@@ -39,3 +39,5 @@ export const roomOptionDefaults: InternalRoomOptions = {
 export const roomConnectOptionDefaults: InternalRoomConnectOptions = {
   autoSubscribe: true,
 } as const;
+
+export const keyRotationMs: number = 60000;

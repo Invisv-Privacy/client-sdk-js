@@ -19,7 +19,9 @@ onmessage = async (event) => {
     readable.pipeThrough(transformer).pipeTo(writable);
   } else if (operation === 'setPassword') {
     const { password } = event.data;
-    await manager.setKey(password);
+    await manager.setPassword(password);
+  } else if (operation === 'rotateKey') {
+    await manager.rotateKey();
   }
 };
 

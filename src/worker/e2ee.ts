@@ -1,4 +1,7 @@
-import log from '../logger';
+import log, { setLogLevel } from '../logger';
+
+// TODO: not sure if there's a way to properly share this with the parent/non-worker library 😬
+setLogLevel('debug');
 
 // Large parts of this e2ee code is borrowed from jitsi's implementation:
 // https://github.com/jitsi/lib-jitsi-meet/blob/84277e1ff3fa925b60d70fe76aea57e8bf182843/modules/e2ee/Context.js#L11-L20
@@ -37,6 +40,10 @@ const UNENCRYPTED_BYTES = {
   undefined: 1, // frame.type is not set on audio
 };
 
+// We use a single byte for the key identifier in the frame trailer so we can have a
+// circular array of one byte's worth of keys
+const KEY_RING_SIZE = 256;
+
 type Chunk = {
   synchronizationSource: number;
   data: ArrayBuffer;
@@ -66,43 +73,100 @@ export function dump(encodedFrame: Chunk, direction: string, max = 16) {
   });
 }
 
-async function generateKey(password: string) {
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const alg = { name: ENCRYPTION_ALGORITHM, iv };
+async function generatePresharedKey(password: string) {
   const passwordBytes = new TextEncoder().encode(password);
-  const passwordHash = await crypto.subtle.digest('SHA-256', passwordBytes);
-  const key = await crypto.subtle.importKey('raw', passwordHash, alg, false, [
-    'encrypt',
-    'decrypt',
+  const presharedKey = await crypto.subtle.importKey('raw', passwordBytes, 'PBKDF2', false, [
+    'deriveBits',
+    'deriveKey',
   ]);
-  return key;
+
+  log.debug('generated preshared key', { presharedKey });
+  return presharedKey;
 }
 
 export default class E2EEManager {
-  currentCryptoKey?: CryptoKey;
+  keyRing: Array<CryptoKey>;
 
-  currentPassword?: string;
-
-  useCryptoOffset: Boolean;
-
-  currentKeyIdentifier: number;
+  currentKeyId: number;
 
   sendCounts: Map<number, number>;
 
+  presharedKey: CryptoKey | undefined;
+
   constructor() {
-    this.useCryptoOffset = true;
-    this.currentKeyIdentifier = 0;
+    this.keyRing = new Array(KEY_RING_SIZE);
+    this.currentKeyId = 0;
     this.sendCounts = new Map();
   }
 
-  async setKey(password: string) {
+  async setPassword(password: string) {
     if (password !== '') {
-      const key = await generateKey(password);
-      this.currentCryptoKey = key;
-      this.currentPassword = password;
-    } else {
-      delete this.currentCryptoKey;
+      this.presharedKey = await generatePresharedKey(password);
+      this.currentKeyId = 0;
+
+      await this.prefillKeyRing();
+
+      log.debug('prefilled key ring', { keyRing: this.keyRing });
     }
+  }
+
+  async generateNextKeyForId(id: number): Promise<CryptoKey> {
+    if (!this.presharedKey) {
+      throw new Error('presharedKey must be set');
+    }
+    const alg = { name: ENCRYPTION_ALGORITHM, length: 256 };
+    const nextKeyId = (id + 1) % this.keyRing.length;
+    const keyIdSalt = new Int8Array(1);
+    keyIdSalt[0] = nextKeyId;
+    const key = await crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: keyIdSalt,
+        iterations: 1,
+        hash: 'SHA-256',
+      },
+      this.presharedKey,
+      alg,
+      false,
+      ['encrypt', 'decrypt'],
+    );
+    return key;
+  }
+
+  async prefillKeyRing() {
+    for (let i = 0; i < this.keyRing.length; i++) {
+      const key = await this.generateNextKeyForId(i);
+      const nextKeyId = (i + 1) % this.keyRing.length;
+      this.keyRing[nextKeyId] = key;
+    }
+  }
+
+  get currentCryptoKey() {
+    return this.keyRing[this.currentKeyId];
+  }
+
+  async rotateKey() {
+    log.debug('rotating key', { currentCryptoKey: this.currentCryptoKey });
+    try {
+      if (this.currentCryptoKey) {
+        const nextKeyId = (this.currentKeyId + 1) % this.keyRing.length;
+        this.currentKeyId = nextKeyId;
+        log.debug('rotated key', {
+          currentCryptoKey: this.currentCryptoKey,
+          currentKeyId: this.currentKeyId,
+        });
+      }
+    } catch (error) {
+      log.error('failed to rotate key', { error });
+    }
+  }
+
+  getKeyForId(id: number) {
+    const key = this.keyRing[id];
+    if (!key) {
+      throw new Error(`key for id: ${id} not found`);
+    }
+    return key;
   }
 
   /**
@@ -144,7 +208,7 @@ export default class E2EEManager {
         const frameTrailer = new Uint8Array(2);
 
         frameTrailer[0] = IV_LENGTH;
-        frameTrailer[1] = this.currentKeyIdentifier;
+        frameTrailer[1] = this.currentKeyId;
 
         return crypto.subtle
           .encrypt(
@@ -213,6 +277,9 @@ export default class E2EEManager {
           ivLength,
         );
 
+        const keyId = frameTrailer[1];
+        const key = this.getKeyForId(keyId);
+
         const cipherTextStart = frameHeader.byteLength;
         const cipherTextLength =
           encodedFrame.data.byteLength -
@@ -224,7 +291,7 @@ export default class E2EEManager {
             iv,
             additionalData: new Uint8Array(encodedFrame.data, 0, frameHeader.byteLength),
           },
-          this.currentCryptoKey,
+          key,
           new Uint8Array(encodedFrame.data, cipherTextStart, cipherTextLength),
         );
 

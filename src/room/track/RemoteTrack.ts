@@ -4,6 +4,7 @@ import { Track } from './Track';
 import log from '../../logger';
 // @ts-ignore
 import Worker from 'web-worker:../../worker/worker';
+import { keyRotationMs } from '../defaults';
 
 export default abstract class RemoteTrack extends Track {
   /** @internal */
@@ -28,6 +29,9 @@ export default abstract class RemoteTrack extends Track {
   initializeEncryption(password: string) {
     this.setPassword(password);
     this.decryptTrack();
+    setInterval(() => {
+      this.worker.postMessage({ operation: 'rotateKey' });
+    }, keyRotationMs);
   }
 
   decryptTrack() {

@@ -24,19 +24,14 @@ const IV_LENGTH = 12;
 // https://tools.ietf.org/html/draft-omara-sframe-00#section-4.2
 // but we put it at the end.
 
-// We copy the first bytes of the VP8 payload unencrypted.
-// For keyframes this is 10 bytes, for non-keyframes (delta) 3. See
+// We copy the first byte of the VP8 payload unencrypted.
 //   https://tools.ietf.org/html/rfc6386#section-9.1
-// This allows the bridge to continue detecting keyframes (only one byte needed in the JVB)
-// and is also a bit easier for the VP8 decoder (i.e. it generates funny garbage pictures
-// instead of being unable to decode).
-// This is a bit for show and we might want to reduce to 1 unconditionally in the final version.
-//
+// This allows the bridge to continue detecting keyframes
 // For audio (where frame.type is not set) we do not encrypt the opus TOC byte:
 //   https://tools.ietf.org/html/rfc6716#section-3.1
 const UNENCRYPTED_BYTES = {
-  key: 10,
-  delta: 3,
+  key: 1,
+  delta: 1,
   undefined: 1, // frame.type is not set on audio
 };
 

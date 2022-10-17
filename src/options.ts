@@ -1,10 +1,11 @@
+import type { ReconnectPolicy } from './room/ReconnectPolicy';
 import type {
   AudioCaptureOptions,
+  AudioOutputOptions,
   TrackPublishDefaults,
   VideoCaptureOptions,
 } from './room/track/options';
 import type { AdaptiveStreamSettings } from './room/track/types';
-import type { ReconnectPolicy } from './room/ReconnectPolicy';
 
 /**
  * @internal
@@ -42,6 +43,11 @@ export interface InternalRoomOptions {
    * default options to use when publishing tracks
    */
   publishDefaults?: TrackPublishDefaults;
+
+  /**
+   * audio output for the room
+   */
+  audioOutput?: AudioOutputOptions;
 
   /**
    * should local tracks be stopped when they are unpublished. defaults to true
@@ -85,6 +91,9 @@ export interface RoomOptions extends Partial<InternalRoomOptions> {}
 export interface InternalRoomConnectOptions {
   /** autosubscribe to room tracks after joining, defaults to true */
   autoSubscribe: boolean;
+
+  /** amount of time for PeerConnection to be established, defaults to 15s */
+  peerConnectionTimeout: number;
 
   /**
    * use to override any RTCConfiguration options.

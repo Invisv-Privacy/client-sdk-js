@@ -1,4 +1,5 @@
 import { TrackEvent } from '../events';
+import { TrackInvalidError } from '../errors';
 import { monitorFrequency } from '../stats';
 import { Track } from './Track';
 import log from '../../logger';
@@ -35,10 +36,24 @@ export default abstract class RemoteTrack extends Track {
   }
 
   decryptTrack() {
+    if (!this.receiver) {
+      throw new TrackInvalidError('unable to decrypt non-existent track');
+    }
+
     try {
       // @ts-expect-error
-      const { readable, writable } = this.receiver.createEncodedStreams();
-      this.worker.postMessage({ operation: 'decode', readable, writable }, [readable, writable]);
+      if (window.RTCRtpScriptTransform) {
+        const options = {
+          operation: 'decode',
+        };
+
+        // @ts-expect-error
+        this.receiver.transform = new RTCRtpScriptTransform(this.worker, options);
+      } else {
+        // @ts-expect-error
+        const { readable, writable } = this.receiver.createEncodedStreams();
+        this.worker.postMessage({ operation: 'decode', readable, writable }, [readable, writable]);
+      }
     } catch (error) {
       log.error('error creating encoded streams or posting message to worker', { error });
     }

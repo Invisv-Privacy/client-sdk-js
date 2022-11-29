@@ -65,10 +65,23 @@ export default abstract class LocalTrack extends Track {
   }
 
   encryptTrack() {
+    if (!this.sender) {
+      throw new TrackInvalidError('unable to encrypt an unpublished track');
+    }
     try {
       // @ts-expect-error
-      const { readable, writable } = this.sender.createEncodedStreams();
-      this.worker.postMessage({ operation: 'encode', readable, writable }, [readable, writable]);
+      if (window.RTCRtpScriptTransform) {
+        const options = {
+          operation: 'encode',
+        };
+
+        // @ts-expect-error
+        this.sender.transform = new RTCRtpScriptTransform(this.worker, options);
+      } else {
+        // @ts-expect-error
+        const { readable, writable } = this.sender.createEncodedStreams();
+        this.worker.postMessage({ operation: 'encode', readable, writable }, [readable, writable]);
+      }
     } catch (error) {
       log.error('error creating encoded streams or posting message to worker', { error });
     }

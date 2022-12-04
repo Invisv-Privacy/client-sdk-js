@@ -283,7 +283,11 @@ export class SignalClient {
               reject(new ConnectionError('got leave response instead of join'));
             }
           } else {
-            reject(new ConnectionError('did not receive join response'));
+            reject(
+              new ConnectionError(
+                `did not receive join response, got ${resp.message?.$case} instead`,
+              ),
+            );
           }
           return;
         }

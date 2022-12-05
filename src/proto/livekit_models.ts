@@ -423,6 +423,9 @@ export interface TrackInfo {
   mimeType: string;
   mid: string;
   codecs: SimulcastCodecInfo[];
+  stereo: boolean;
+  /** true if RED (Redundant Encoding) is disabled for audio */
+  disableRed: boolean;
 }
 
 /** provide information about available spatial layers */
@@ -431,7 +434,7 @@ export interface VideoLayer {
   quality: VideoQuality;
   width: number;
   height: number;
-  /** target bitrate, server will measure actual */
+  /** target bitrate in bit per second (bps), server will measure actual */
   bitrate: number;
   ssrc: number;
 }
@@ -1248,6 +1251,8 @@ function createBaseTrackInfo(): TrackInfo {
     mimeType: "",
     mid: "",
     codecs: [],
+    stereo: false,
+    disableRed: false,
   };
 }
 
@@ -1291,6 +1296,12 @@ export const TrackInfo = {
     }
     for (const v of message.codecs) {
       SimulcastCodecInfo.encode(v!, writer.uint32(106).fork()).ldelim();
+    }
+    if (message.stereo === true) {
+      writer.uint32(112).bool(message.stereo);
+    }
+    if (message.disableRed === true) {
+      writer.uint32(120).bool(message.disableRed);
     }
     return writer;
   },
@@ -1341,6 +1352,12 @@ export const TrackInfo = {
         case 13:
           message.codecs.push(SimulcastCodecInfo.decode(reader, reader.uint32()));
           break;
+        case 14:
+          message.stereo = reader.bool();
+          break;
+        case 15:
+          message.disableRed = reader.bool();
+          break;
         default:
           reader.skipType(tag & 7);
           break;
@@ -1364,6 +1381,8 @@ export const TrackInfo = {
       mimeType: isSet(object.mimeType) ? String(object.mimeType) : "",
       mid: isSet(object.mid) ? String(object.mid) : "",
       codecs: Array.isArray(object?.codecs) ? object.codecs.map((e: any) => SimulcastCodecInfo.fromJSON(e)) : [],
+      stereo: isSet(object.stereo) ? Boolean(object.stereo) : false,
+      disableRed: isSet(object.disableRed) ? Boolean(object.disableRed) : false,
     };
   },
 
@@ -1390,6 +1409,8 @@ export const TrackInfo = {
     } else {
       obj.codecs = [];
     }
+    message.stereo !== undefined && (obj.stereo = message.stereo);
+    message.disableRed !== undefined && (obj.disableRed = message.disableRed);
     return obj;
   },
 
@@ -1408,6 +1429,8 @@ export const TrackInfo = {
     message.mimeType = object.mimeType ?? "";
     message.mid = object.mid ?? "";
     message.codecs = object.codecs?.map((e) => SimulcastCodecInfo.fromPartial(e)) || [];
+    message.stereo = object.stereo ?? false;
+    message.disableRed = object.disableRed ?? false;
     return message;
   },
 };

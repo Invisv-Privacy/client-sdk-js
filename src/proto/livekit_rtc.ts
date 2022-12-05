@@ -195,6 +195,9 @@ export interface AddTrackRequest {
   simulcastCodecs: SimulcastCodec[];
   /** server ID of track, publish new codec to exist track */
   sid: string;
+  stereo: boolean;
+  /** true if RED (Redundant Encoding) is disabled for audio */
+  disableRed: boolean;
 }
 
 export interface TrickleRequest {
@@ -264,7 +267,6 @@ export interface UpdateTrackSettings {
   width: number;
   /** for video, height to receive */
   height: number;
-  /** for video, frame rate to receive */
   fps: number;
 }
 
@@ -1080,6 +1082,8 @@ function createBaseAddTrackRequest(): AddTrackRequest {
     layers: [],
     simulcastCodecs: [],
     sid: "",
+    stereo: false,
+    disableRed: false,
   };
 }
 
@@ -1117,6 +1121,12 @@ export const AddTrackRequest = {
     }
     if (message.sid !== "") {
       writer.uint32(90).string(message.sid);
+    }
+    if (message.stereo === true) {
+      writer.uint32(96).bool(message.stereo);
+    }
+    if (message.disableRed === true) {
+      writer.uint32(104).bool(message.disableRed);
     }
     return writer;
   },
@@ -1161,6 +1171,12 @@ export const AddTrackRequest = {
         case 11:
           message.sid = reader.string();
           break;
+        case 12:
+          message.stereo = reader.bool();
+          break;
+        case 13:
+          message.disableRed = reader.bool();
+          break;
         default:
           reader.skipType(tag & 7);
           break;
@@ -1184,6 +1200,8 @@ export const AddTrackRequest = {
         ? object.simulcastCodecs.map((e: any) => SimulcastCodec.fromJSON(e))
         : [],
       sid: isSet(object.sid) ? String(object.sid) : "",
+      stereo: isSet(object.stereo) ? Boolean(object.stereo) : false,
+      disableRed: isSet(object.disableRed) ? Boolean(object.disableRed) : false,
     };
   },
 
@@ -1208,6 +1226,8 @@ export const AddTrackRequest = {
       obj.simulcastCodecs = [];
     }
     message.sid !== undefined && (obj.sid = message.sid);
+    message.stereo !== undefined && (obj.stereo = message.stereo);
+    message.disableRed !== undefined && (obj.disableRed = message.disableRed);
     return obj;
   },
 
@@ -1224,6 +1244,8 @@ export const AddTrackRequest = {
     message.layers = object.layers?.map((e) => VideoLayer.fromPartial(e)) || [];
     message.simulcastCodecs = object.simulcastCodecs?.map((e) => SimulcastCodec.fromPartial(e)) || [];
     message.sid = object.sid ?? "";
+    message.stereo = object.stereo ?? false;
+    message.disableRed = object.disableRed ?? false;
     return message;
   },
 };

@@ -31,7 +31,10 @@ export default class RemoteParticipant extends Participant {
   private audioOutput?: AudioOutputOptions;
 
   /** @internal */
-  static fromParticipantInfo(signalClient: SignalClient, pi: ParticipantInfo): RemoteParticipant {
+  static fromParticipantInfo(
+    signalClient: SignalClient,
+    pi: ParticipantInfo & { e2eePassword?: string },
+  ): RemoteParticipant {
     return new RemoteParticipant(
       signalClient,
       pi.sid,
@@ -246,7 +249,7 @@ export default class RemoteParticipant extends Participant {
   }
 
   /** @internal */
-  updateInfo(info: ParticipantInfo) {
+  updateInfo(info: ParticipantInfo & { e2eePassword?: string }) {
     log.trace('updateInfo', info);
     super.updateInfo(info);
 

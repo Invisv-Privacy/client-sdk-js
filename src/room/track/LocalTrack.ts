@@ -7,7 +7,7 @@ import { getEmptyAudioStreamTrack, getEmptyVideoStreamTrack, isMobile } from '..
 import type { VideoCodec } from './options';
 import { attachToElement, detachTrack, Track } from './Track';
 // @ts-ignore
-import Worker from 'web-worker:../../worker/worker';
+import Worker from '../../worker/worker?worker';
 import { keyRotationMs } from '../defaults';
 
 export default abstract class LocalTrack extends Track {

@@ -4,7 +4,7 @@ import { monitorFrequency } from '../stats';
 import { Track } from './Track';
 import log from '../../logger';
 // @ts-ignore
-import Worker from 'web-worker:../../worker/worker';
+import Worker from '../../worker/worker?worker';
 import { keyRotationMs } from '../defaults';
 
 export default abstract class RemoteTrack extends Track {

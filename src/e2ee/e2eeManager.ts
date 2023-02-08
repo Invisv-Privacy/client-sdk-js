@@ -16,7 +16,7 @@ import {
 } from './types';
 // eslint-disable-next-line import/extensions
 // @ts-ignore
-import E2EEWorker from './e2ee.worker.js?worker';
+import E2EEWorker from './e2ee.worker.js?worker&inline';
 import { isE2EESupported, isScriptTransformSupported, mimeTypeToCodecString } from './utils';
 import type Room from '../room/Room';
 import { ParticipantEvent, RoomEvent } from '../room/events';

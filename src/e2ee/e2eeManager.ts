@@ -16,7 +16,7 @@ import {
 } from './types';
 // eslint-disable-next-line import/extensions
 // @ts-ignore
-import WebWorkerURL from './e2ee.worker.js?worker&url';
+import E2EEWorker from './e2ee.worker.js?worker';
 import { isE2EESupported, isScriptTransformSupported, mimeTypeToCodecString } from './utils';
 import type Room from '../room/Room';
 import { ParticipantEvent, RoomEvent } from '../room/events';
@@ -34,10 +34,6 @@ export class E2EEManager extends (EventEmitter as new () => TypedEmitter<E2EEMan
   protected worker?: Worker;
 
   protected room?: Room;
-
-  protected webWorkerUrl = new URL(WebWorkerURL, import.meta.url);
-
-  protected workerAsModule = true;
 
   private encryptionEnabled: boolean;
 
@@ -67,9 +63,7 @@ export class E2EEManager extends (EventEmitter as new () => TypedEmitter<E2EEMan
     if (room !== this.room) {
       this.room = room;
       this.setupEventListeners(room, this.keyProvider);
-      this.worker = new Worker(this.webWorkerUrl, {
-        type: this.workerAsModule ? 'module' : 'classic',
-      });
+      this.worker = new E2EEWorker() as Worker;
       const msg: InitMessage = {
         kind: 'init',
         data: {

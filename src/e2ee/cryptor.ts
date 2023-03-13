@@ -3,7 +3,7 @@
 
 import { EventEmitter } from 'events';
 import type TypedEmitter from 'typed-emitter';
-import { setLogLevel, workerLogger } from '../logger';
+import { workerLogger } from '../logger';
 import { ENCRYPTION_ALGORITHM, IV_LENGTH, KEYRING_SIZE, UNENCRYPTED_BYTES } from './constants';
 import { E2EEError, E2EEErrorReason } from './errors';
 import { CryptorCallbacks, CryptorEvent, ErrorMessage } from './types';
@@ -43,8 +43,6 @@ export class BaseCryptor extends (EventEmitter as new () => TypedEmitter<Cryptor
 export class Cryptor extends BaseCryptor {
   private sendCounts: Map<number, number>;
 
-  private useSharedKey: boolean | undefined;
-
   private isKeyInvalid = false;
 
   private participantId: string | undefined;
@@ -63,7 +61,6 @@ export class Cryptor extends BaseCryptor {
   }) {
     super();
     this.sendCounts = new Map();
-    this.useSharedKey = opts.sharedKey;
     this.keys = opts.keys;
     this.participantId = opts.participantId;
   }

@@ -1,4 +1,3 @@
-// @ts-check
 import typescript from 'rollup-plugin-typescript2';
 import commonjs from '@rollup/plugin-commonjs';
 import { nodeResolve } from '@rollup/plugin-node-resolve';
@@ -7,6 +6,7 @@ import json from '@rollup/plugin-json';
 import { terser } from 'rollup-plugin-terser';
 import replace from 'rollup-plugin-re';
 import filesize from 'rollup-plugin-filesize';
+import webWorkerLoader from 'rollup-plugin-web-worker-loader';
 import del from 'rollup-plugin-delete';
 
 import packageJson from './package.json';
@@ -41,6 +41,7 @@ export default {
     typescript({ tsconfig: './tsconfig.json' }),
     commonjs(),
     json(),
+    webWorkerLoader({ extensions: ['.js', '.ts'], pattern: /(.+)\?worker/ }),
     babel({
       babelHelpers: 'bundled',
       plugins: ['@babel/plugin-proposal-object-rest-spread'],

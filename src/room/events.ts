@@ -255,6 +255,10 @@ export enum RoomEvent {
    * Recording of a room has started/stopped.
    */
   RecordingStatusChanged = 'recordingStatusChanged',
+
+  ParticipantEncryptionStatusChanged = 'participantEncryptionStatusChanged',
+
+  EncryptionError = 'encryptionError',
 }
 
 export enum ParticipantEvent {
@@ -406,6 +410,9 @@ export enum ParticipantEvent {
    * args: (prevPermissions: [[ParticipantPermission]])
    */
   ParticipantPermissionsChanged = 'participantPermissionsChanged',
+
+  /** @internal */
+  PCTrackAdded = 'pcTrackAdded',
 }
 
 /** @internal */

@@ -55,6 +55,7 @@ export interface SignalOptions {
   publishOnly?: string;
   adaptiveStream?: boolean;
   maxRetries: number;
+  e2eeEnabled: boolean;
 }
 
 type SignalMessage = SignalRequest['message'];
@@ -386,7 +387,7 @@ export class SignalClient {
   sendAddTrack(req: AddTrackRequest): void {
     this.sendRequest({
       $case: 'addTrack',
-      addTrack: AddTrackRequest.fromPartial(req),
+      addTrack: req,
     });
   }
 

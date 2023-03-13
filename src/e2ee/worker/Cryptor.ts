@@ -11,7 +11,6 @@ import {
   CryptorCallbacks,
   CryptorEvent,
   DecodeRatchetOptions,
-  ErrorMessage,
   KeyProviderOptions,
   KeySet,
 } from '../types';
@@ -139,10 +138,11 @@ export class Cryptor extends BaseCryptor {
       .pipeThrough(transformStream)
       .pipeTo(writable)
       .catch((e) => {
-        const errorMsg: ErrorMessage = {
+        const errorMsg = {
           kind: 'error',
           data: {
-            error: new E2EEError(e.message, E2EEErrorReason.InternalError),
+            reason: e.reason,
+            message: e.message,
           },
         };
         postMessage(errorMsg);

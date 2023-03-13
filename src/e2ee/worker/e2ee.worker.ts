@@ -2,7 +2,6 @@ import { Cryptor } from './Cryptor';
 import type {
   E2EEWorkerMessage,
   EnableMessage,
-  ErrorMessage,
   KeyProviderOptions,
   RatchetMessage,
 } from '../types';
@@ -179,16 +178,6 @@ function setSharedKey(key: CryptoKey, index?: number) {
   }
 }
 
-function setupCryptorErrorEvents(cryptor: Cryptor) {
-  cryptor.on('cryptorError', (error) => {
-    const msg: ErrorMessage = {
-      kind: 'error',
-      data: { error },
-    };
-    postMessage(msg);
-  });
-}
-
 function emitRatchetedKeys(material: CryptoKey, keyIndex?: number) {
   const msg: RatchetMessage = {
     kind: `ratchetKey`,
@@ -216,4 +205,14 @@ if (self.RTCTransformEvent) {
     workerLogger.debug('transform', { codec });
     cryptor.setupTransform(kind, transformer.readable, transformer.writable, trackId, codec);
   };
+}
+
+function setupCryptorErrorEvents(cryptor: Cryptor) {
+  cryptor.on('cryptorError', (error) => {
+    const msg = {
+      kind: 'error',
+      data: { reason: error.reason, message: error.message },
+    };
+    postMessage(msg);
+  });
 }

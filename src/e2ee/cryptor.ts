@@ -6,7 +6,7 @@ import type TypedEmitter from 'typed-emitter';
 import { workerLogger } from '../logger';
 import { ENCRYPTION_ALGORITHM, IV_LENGTH, KEYRING_SIZE, UNENCRYPTED_BYTES } from './constants';
 import { E2EEError, E2EEErrorReason } from './errors';
-import { CryptorCallbacks, CryptorEvent, ErrorMessage } from './types';
+import { CryptorCallbacks, CryptorEvent } from './types';
 import { isVideoFrame } from './utils';
 
 export interface CryptorConstructor {
@@ -106,10 +106,11 @@ export class Cryptor extends BaseCryptor {
       .pipeThrough(transformStream)
       .pipeTo(writable)
       .catch((e) => {
-        const errorMsg: ErrorMessage = {
+        const errorMsg = {
           kind: 'error',
           data: {
-            error: new E2EEError(e.message, E2EEErrorReason.InternalError),
+            reason: e.reason,
+            message: e.message,
           },
         };
         postMessage(errorMsg);

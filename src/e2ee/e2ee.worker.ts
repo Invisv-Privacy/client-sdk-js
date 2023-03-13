@@ -1,5 +1,5 @@
 import { Cryptor, ParticipantKeys } from './cryptor';
-import type { E2EEWorkerMessage, EnableMessage, ErrorMessage } from './types';
+import type { E2EEWorkerMessage, EnableMessage } from './types';
 import { setLogLevel, workerLogger } from '../logger';
 
 const participantCryptors: Cryptor[] = [];
@@ -172,9 +172,9 @@ if (self.RTCTransformEvent) {
 
 function setupCryptorErrorEvents(cryptor: Cryptor) {
   cryptor.on('cryptorError', (error) => {
-    const msg: ErrorMessage = {
+    const msg = {
       kind: 'error',
-      data: { error },
+      data: { reason: error.reason, message: error.message },
     };
     postMessage(msg);
   });

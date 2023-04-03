@@ -71,8 +71,6 @@ export default class LocalParticipant extends Participant {
 
   private encryptionType: Encryption_Type = Encryption_Type.NONE;
 
-  private reconnectFuture?: Future<void>;
-
   /** @internal */
   constructor(sid: string, identity: string, engine: RTCEngine, options: InternalRoomOptions) {
     super(sid, identity);

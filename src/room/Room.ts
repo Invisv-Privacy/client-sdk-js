@@ -37,6 +37,7 @@ import {
   videoDefaults,
 } from './defaults';
 import DeviceManager from './DeviceManager';
+import { E2EEManager } from '../e2ee/E2eeManager';
 import { ConnectionError, UnsupportedServer } from './errors';
 import { EngineEvent, ParticipantEvent, RoomEvent, TrackEvent } from './events';
 import LocalParticipant from './participant/LocalParticipant';
@@ -63,6 +64,8 @@ import {
   supportsSetSinkId,
   unpackStreamId,
 } from './utils';
+import { EncryptionEvent } from '../e2ee';
+import type { E2EEError } from '../e2ee/errors';
 
 export enum ConnectionState {
   Disconnected = 'disconnected',
@@ -113,6 +116,9 @@ class Room extends (EventEmitter as new () => TypedEmitter<RoomEventCallbacks>) 
   /** options of room */
   options: InternalRoomOptions;
 
+  /** reflects the sender encryption status of the local participant */
+  isE2EEEnabled: boolean = false;
+
   private _isRecording: boolean = false;
 
   private identityToSid: Map<string, string>;
@@ -131,6 +137,8 @@ class Room extends (EventEmitter as new () => TypedEmitter<RoomEventCallbacks>) 
   private connectFuture?: Future<void>;
 
   private disconnectLock: Mutex;
+
+  private e2eeManager: E2EEManager | undefined;
 
   /**
    * Creates a new Room, the primary construct for a LiveKit session.
@@ -161,6 +169,40 @@ class Room extends (EventEmitter as new () => TypedEmitter<RoomEventCallbacks>) 
     this.disconnectLock = new Mutex();
 
     this.localParticipant = new LocalParticipant('', '', this.engine, this.options);
+
+    if (this.options.e2ee) {
+      this.setupE2EE();
+    }
+  }
+
+  async setE2EEEnabled(enabled: boolean) {
+    if (this.e2eeManager) {
+      await Promise.all([
+        this.localParticipant.setE2EEEnabled(enabled),
+        this.e2eeManager.setParticipantCryptorEnabled(enabled),
+      ]);
+    } else {
+      throw Error('e2ee not configured, please set e2ee settings within the room options');
+    }
+  }
+
+  private setupE2EE() {
+    if (this.options.e2ee) {
+      this.e2eeManager = new E2EEManager(this.options.e2ee);
+      this.e2eeManager.on(
+        EncryptionEvent.ParticipantEncryptionStatusChanged,
+        (enabled, participant) => {
+          if (participant instanceof LocalParticipant) {
+            this.isE2EEEnabled = enabled;
+          }
+          this.emit(RoomEvent.ParticipantEncryptionStatusChanged, enabled, participant);
+        },
+      );
+      this.e2eeManager.on(EncryptionEvent.Error, (error) =>
+        this.emit(RoomEvent.EncryptionError, error),
+      );
+      this.e2eeManager?.setup(this);
+    }
   }
 
   private maybeCreateEngine() {
@@ -294,6 +336,7 @@ class Room extends (EventEmitter as new () => TypedEmitter<RoomEventCallbacks>) 
             adaptiveStream:
               typeof this.options.adaptiveStream === 'object' ? true : this.options.adaptiveStream,
             maxRetries: this.connOptions.maxRetries,
+            e2eeEnabled: !!this.e2eeManager,
           },
           this.abortController.signal,
         );
@@ -1471,4 +1514,6 @@ export type RoomEventCallbacks = {
   audioPlaybackChanged: (playing: boolean) => void;
   signalConnected: () => void;
   recordingStatusChanged: (recording: boolean) => void;
+  participantEncryptionStatusChanged: (encrypted: boolean, participant?: Participant) => void;
+  encryptionError: (error: E2EEError) => void;
 };

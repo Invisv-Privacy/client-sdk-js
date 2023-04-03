@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import type { MediaAttributes } from 'sdp-transform';
 import type TypedEventEmitter from 'typed-emitter';
 import { SignalClient, SignalOptions } from '../api/SignalClient';
 import log from '../logger';
@@ -38,6 +39,7 @@ import type { SimulcastTrackInfo } from './track/LocalVideoTrack';
 import type { TrackPublishOptions, VideoCodec } from './track/options';
 import { Track } from './track/Track';
 import {
+  isVideoCodec,
   isWeb,
   Mutex,
   sleep,
@@ -281,6 +283,13 @@ export default class RTCEngine extends (EventEmitter as new () => TypedEventEmit
     this.participantSid = joinResponse.participant?.sid;
 
     const rtcConfig = this.makeRTCConfiguration(joinResponse);
+
+    if (this.signalOpts?.e2eeEnabled) {
+      log.debug('E2EE - setting up transports with insertable streams');
+      //  this makes sure that no data is sent before the transforms are ready
+      // @ts-ignore
+      rtcConfig.encodedInsertableStreams = true;
+    }
 
     this.publisher = new PCTransport(rtcConfig);
     this.subscriber = new PCTransport(rtcConfig);
@@ -586,11 +595,13 @@ export default class RTCEngine extends (EventEmitter as new () => TypedEventEmit
     encodings?: RTCRtpEncodingParameters[],
   ) {
     if (supportsTransceiver()) {
-      return this.createTransceiverRTCRtpSender(track, opts, encodings);
+      const sender = await this.createTransceiverRTCRtpSender(track, opts, encodings);
+      return sender;
     }
     if (supportsAddTrack()) {
-      log.debug('using add-track fallback');
-      return this.createRTCRtpSender(track.mediaStreamTrack);
+      log.warn('using add-track fallback');
+      const sender = await this.createRTCRtpSender(track.mediaStreamTrack);
+      return sender;
     }
     throw new UnexpectedConnectionState('Required webRTC APIs not supported on this device');
   }
@@ -602,7 +613,6 @@ export default class RTCEngine extends (EventEmitter as new () => TypedEventEmit
     encodings?: RTCRtpEncodingParameters[],
   ) {
     // store RTCRtpSender
-    // @ts-ignore
     if (supportsTransceiver()) {
       return this.createSimulcastTransceiverSender(track, simulcastTrack, opts, encodings);
     }
@@ -623,7 +633,13 @@ export default class RTCEngine extends (EventEmitter as new () => TypedEventEmit
       throw new UnexpectedConnectionState('publisher is closed');
     }
 
-    const transceiverInit: RTCRtpTransceiverInit = { direction: 'sendonly' };
+    const streams: MediaStream[] = [];
+
+    if (track.mediaStream) {
+      streams.push(track.mediaStream);
+    }
+
+    const transceiverInit: RTCRtpTransceiverInit = { direction: 'sendonly', streams };
     if (encodings) {
       transceiverInit.sendEncodings = encodings;
     }
@@ -632,6 +648,7 @@ export default class RTCEngine extends (EventEmitter as new () => TypedEventEmit
       track.mediaStreamTrack,
       transceiverInit,
     );
+
     if (track.kind === Track.Kind.Video && opts.videoCodec) {
       this.setPreferredCodec(transceiver, track.kind, opts.videoCodec);
       track.codec = opts.videoCodec;
@@ -1017,6 +1034,17 @@ export default class RTCEngine extends (EventEmitter as new () => TypedEventEmit
         });
       });
 
+      this.publisher.once(PCEvents.RTPVideoPayloadTypes, (rtpTypes: MediaAttributes['rtp']) => {
+        const rtpMap = new Map<number, VideoCodec>();
+        rtpTypes.forEach((rtp) => {
+          const codec = rtp.codec.toLowerCase();
+          if (isVideoCodec(codec)) {
+            rtpMap.set(rtp.payload, codec);
+          }
+        });
+        this.emit(EngineEvent.RTPVideoMapUpdate, rtpMap);
+      });
+
       this.publisher.negotiate((e) => {
         cleanup();
         reject(e);
@@ -1129,4 +1157,7 @@ export type EngineEventCallbacks = {
   activeSpeakersUpdate: (speakers: Array<SpeakerInfo>) => void;
   dataPacketReceived: (userPacket: UserPacket, kind: DataPacket_Kind) => void;
   transportsCreated: (publisher: PCTransport, subscriber: PCTransport) => void;
+  /** @internal */
+  trackSenderAdded: (track: Track, sender: RTCRtpSender) => void;
+  rtpVideoMapUpdate: (rtpMap: Map<number, VideoCodec>) => void;
 };

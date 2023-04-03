@@ -4,6 +4,7 @@ import type { InternalRoomOptions } from '../../options';
 import {
   DataPacket,
   DataPacket_Kind,
+  Encryption_Type,
   ParticipantInfo,
   ParticipantPermission,
 } from '../../proto/livekit_models';
@@ -67,6 +68,10 @@ export default class LocalParticipant extends Participant {
 
   // keep a pointer to room options
   private roomOptions: InternalRoomOptions;
+
+  private encryptionType: Encryption_Type = Encryption_Type.NONE;
+
+  private reconnectFuture?: Future<void>;
 
   /** @internal */
   constructor(sid: string, identity: string, engine: RTCEngine, options: InternalRoomOptions) {
@@ -176,6 +181,12 @@ export default class LocalParticipant extends Participant {
       this.emit(ParticipantEvent.ParticipantPermissionsChanged, prevPermissions);
     }
     return changed;
+  }
+
+  /** @internal */
+  async setE2EEEnabled(enabled: boolean) {
+    this.encryptionType = enabled ? Encryption_Type.GCM : Encryption_Type.NONE;
+    await this.republishAllTracks(undefined, false);
   }
 
   /**
@@ -456,18 +467,11 @@ export default class LocalParticipant extends Participant {
       ...options,
     };
 
-    // is it already published? if so skip
-    let existingPublication: LocalTrackPublication | undefined;
-    this.tracks.forEach((publication) => {
-      if (!publication.track) {
-        return;
-      }
-      if (publication.track === track) {
-        existingPublication = <LocalTrackPublication>publication;
-      }
-    });
-
-    if (existingPublication) return existingPublication;
+    // disable simulcast if e2ee is set on safari
+    if (isSafari() && this.roomOptions.e2ee) {
+      log.info(`End-to-end encryption is set up, simulcast publishing will be disabled on Safari`);
+      opts.simulcast = false;
+    }
 
     if (opts.source) {
       track.source = opts.source;
@@ -520,8 +524,9 @@ export default class LocalParticipant extends Participant {
       muted: track.isMuted,
       source: Track.sourceToProto(track.source),
       disableDtx: !(opts.dtx ?? true),
+      encryption: this.encryptionType,
       stereo: isStereo,
-      disableRed: !(opts.red ?? true),
+      // disableRed: !(opts.red ?? true),
     });
 
     // compute encodings and layers for video
@@ -784,7 +789,7 @@ export default class LocalParticipant extends Participant {
     ) as LocalTrackPublication[];
   }
 
-  async republishAllTracks(options?: TrackPublishOptions) {
+  async republishAllTracks(options?: TrackPublishOptions, restartTracks: boolean = true) {
     const localPubs: LocalTrackPublication[] = [];
     this.tracks.forEach((pub) => {
       if (pub.track) {
@@ -799,6 +804,19 @@ export default class LocalParticipant extends Participant {
       localPubs.map(async (pub) => {
         const track = pub.track!;
         await this.unpublishTrack(track, false);
+        if (
+          restartTracks &&
+          !track.isMuted &&
+          (track instanceof LocalAudioTrack || track instanceof LocalVideoTrack) &&
+          !track.isUserProvided
+        ) {
+          // generally we need to restart the track before publishing, often a full reconnect
+          // is necessary because computer had gone to sleep.
+          log.debug('restarting existing track', {
+            track: pub.trackSid,
+          });
+          await track.restartTrack();
+        }
         await this.publishTrack(track, pub.options);
       }),
     );
